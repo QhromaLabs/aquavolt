@@ -68,15 +68,15 @@ app.get('/', (req, res) => {
     res.send('AquaVolt Proxy is Running 🚀');
 });
 
-app.listen(PORT, '0.0.0.0', () => {
+const server = app.listen(PORT, '0.0.0.0', () => {
+    const address = server.address();
     console.log(`
 ╔════════════════════════════════════════╗
 ║   Futurise API Proxy Server Running    ║
 ╠════════════════════════════════════════╣
-║  Port: ${PORT}                            ║
+║  Address: ${address.address}                   ║
+║  Port: ${address.port}                            ║
 ║  Futurise: ${FUTURISE_BASE_URL}     ║
 ╚════════════════════════════════════════╝
-
-Proxy ready to forward requests to Futurise API
   `);
 });
