@@ -19,12 +19,11 @@ app.use(cors());
 app.use(express.json());
 
 // Proxy all requests to Futurise
-app.all('/api/*', async (req, res) => {
+app.use('/api', async (req, res) => {
     try {
-        const futurisePath = req.path.replace('/api', '');
-        const futuriseUrl = `${FUTURISE_BASE_URL}${futurisePath}`;
+        const futuriseUrl = `${FUTURISE_BASE_URL}${req.url}`;
 
-        console.log(`[${new Date().toISOString()}] ${req.method} ${futurisePath}`);
+        console.log(`[${new Date().toISOString()}] ${req.method} ${req.url}`);
 
         const options = {
             method: req.method,
