@@ -63,6 +63,11 @@ app.get('/health', (req, res) => {
     });
 });
 
+// Root endpoint info
+app.get('/', (req, res) => {
+    res.send('AquaVolt Proxy is Running 🚀');
+});
+
 app.listen(PORT, '0.0.0.0', () => {
     console.log(`
 ╔════════════════════════════════════════╗
