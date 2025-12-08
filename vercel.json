@@ -1,0 +1,8 @@
+{
+    "rewrites": [
+        {
+            "source": "/futurise-api/(.*)",
+            "destination": "/api/proxy?slug=$1"
+        }
+    ]
+}
