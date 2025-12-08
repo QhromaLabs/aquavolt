@@ -8,6 +8,7 @@
         "build": "vite build",
         "preview": "vite preview",
         "proxy": "node proxy-server.cjs",
+        "start": "node proxy-server.cjs",
         "lint": "eslint ."
     },
     "dependencies": {

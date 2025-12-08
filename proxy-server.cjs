@@ -4,7 +4,7 @@ const fetch = require('node-fetch');
 const https = require('https');
 
 const app = express();
-const PORT = process.env.PROXY_PORT || 3001;
+const PORT = process.env.PORT || process.env.PROXY_PORT || 3001;
 
 // Futurise API base URL
 const FUTURISE_BASE_URL = 'https://47.90.150.122:4680';
