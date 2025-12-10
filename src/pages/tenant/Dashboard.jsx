@@ -1,29 +1,115 @@
-import { Typography, Row, Col, Statistic, Button, Empty, Spin, Alert, Space, Tag } from 'antd';
+import { useState, useEffect, useRef } from 'react';
+import { Typography, Row, Col, Statistic, Button, Empty, Spin, Alert, Space, Tag, Avatar, Badge, message, Modal } from 'antd';
+
 import {
     ThunderboltOutlined,
-    DollarOutlined,
-    ShoppingOutlined,
     HistoryOutlined,
-    HomeOutlined,
-    UserOutlined
+    UserOutlined,
+    BellOutlined,
+    CopyOutlined,
+    MessageOutlined,
+    CustomerServiceOutlined,
+    CheckCircleOutlined,
+    QrcodeOutlined
 } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import { useTenantData } from '../../hooks/useTenantData';
-import MainLayout from '../../components/Layout/MainLayout';
+import { useAuth } from '../../hooks/useAuth';
+import { useNotificationCount } from '../../hooks/useNotificationCount';
+import TenantLayout from '../../layouts/TenantLayout';
 import MobileCard from '../../components/mobile/MobileCard';
+import { supabase } from '../../lib/supabase';
+import TokenReceiptModal from '../../components/common/TokenReceiptModal';
+import ScanModal from '../../components/common/ScanModal';
 
-const { Title, Text, Paragraph } = Typography;
+const { Title, Text } = Typography;
 
 const TenantDashboard = () => {
     const navigate = useNavigate();
     const { units, topups, loading, error, hasUnits, hasTopups, refetch } = useTenantData();
+    const { profile } = useAuth(); // Get user profile for name
+    const { unreadCount } = useNotificationCount();
 
-    // Calculate total spent
-    const totalSpent = topups.reduce((sum, topup) => sum + parseFloat(topup.amount_paid || 0), 0);
+    const [selectedTopup, setSelectedTopup] = useState(null);
+    const [isScannerOpen, setIsScannerOpen] = useState(false);
+
+    const handleScan = async (decodedText) => {
+        try {
+            const data = JSON.parse(decodedText);
+            if (data.action === 'claim_unit' && data.unit_id) {
+                message.loading('Linking unit...', 0);
+
+                const { error } = await supabase
+                    .from('unit_assignments')
+                    .insert({
+                        unit_id: data.unit_id,
+                        tenant_id: profile?.id,
+                        status: 'active',
+                        start_date: new Date().toISOString()
+                    });
+
+                message.destroy();
+
+                if (error) {
+                    console.error('Linking error:', error);
+                    if (error.code === '23505') {
+                        message.warning('You are already assigned to this unit.');
+                    } else {
+                        message.error('Failed to link unit.');
+                    }
+                } else {
+                    message.success('Unit linked successfully!');
+                    refetch();
+                }
+            } else {
+                message.error('Invalid QR Code');
+            }
+        } catch (e) {
+            console.error(e);
+            message.error('Error processing QR code');
+        }
+    };
+
+    // Helper to get first name
+    const firstName = profile?.full_name?.split(' ')[0] || 'User';
+
+    // Get primary unit (first one) or null
+    const primaryUnit = units && units.length > 0 ? units[0] : null;
+
+    const [supportPhone, setSupportPhone] = useState('');
+
+    // Helper to format token
+    const formatToken = (token) => {
+        if (!token) return '';
+        // Remove existing dashes if any, then group by 4
+        const cleanToken = token.replace(/-/g, '');
+        return cleanToken.match(/.{1,4}/g)?.join('-') || token;
+    };
+
+    const handleCopyToken = (token) => {
+        if (!token) return;
+        const cleanToken = token.replace(/-/g, '');
+        navigator.clipboard.writeText(cleanToken);
+        message.success('Token copied to clipboard!');
+    };
+
+    useEffect(() => {
+        const fetchSettings = async () => {
+            const { data } = await supabase
+                .from('admin_settings')
+                .select('value')
+                .eq('key', 'support_phone_whatsapp')
+                .single();
+            if (data?.value) {
+                setSupportPhone(data.value);
+            }
+        };
+        fetchSettings();
+    }, []);
 
     if (loading) {
         return (
-            <MainLayout>
+            <TenantLayout>
                 <div style={{
                     textAlign: 'center',
                     padding: '60px 20px',
@@ -37,294 +123,361 @@ const TenantDashboard = () => {
                         <Text type="secondary">Loading your dashboard...</Text>
                     </Space>
                 </div>
-            </MainLayout>
+            </TenantLayout>
         );
     }
 
     if (error) {
         return (
-            <MainLayout>
-                <Alert
-                    message="Error Loading Data"
-                    description={error}
-                    type="error"
-                    showIcon
-                    action={
-                        <Button size="small" onClick={refetch}>
-                            Retry
-                        </Button>
-                    }
-                />
-            </MainLayout>
+            <TenantLayout>
+                <div style={{ padding: '20px' }}>
+                    <Alert
+                        message="Error Loading Data"
+                        description={error}
+                        type="error"
+                        showIcon
+                        action={
+                            <Button size="small" onClick={refetch}>
+                                Retry
+                            </Button>
+                        }
+                    />
+                </div>
+            </TenantLayout>
         );
     }
 
     return (
-        <MainLayout>
-            {/* Header */}
-            <div style={{ marginBottom: 24 }}>
-                <Title level={2} style={{ margin: 0, fontSize: '24px' }}>
-                    Welcome Back! ⚡
-                </Title>
-                <Text type="secondary" style={{ fontSize: '14px' }}>
-                    Manage your electricity units
-                </Text>
-            </div>
-
-            {/* Quick Actions - Mobile Optimized */}
-            <Row gutter={[12, 12]} style={{ marginBottom: 24 }}>
-                <Col xs={12} sm={8}>
-                    <Button
-                        type="primary"
-                        size="large"
-                        block
-                        icon={<ShoppingOutlined />}
-                        onClick={() => navigate('/tenant/buy-token')}
-                        style={{
-                            height: '56px',
-                            borderRadius: '10px',
-                            fontSize: '15px',
-                            fontWeight: 600,
-                            background: 'linear-gradient(135deg, #1ecf49 0%, #36ea98 100%)',
-                            border: 'none',
-                            boxShadow: '0 4px 12px rgba(30, 207, 73, 0.3)',
-                        }}
-                    >
-                        Buy Token
-                    </Button>
-                </Col>
-                <Col xs={12} sm={8}>
-                    <Button
-                        size="large"
-                        block
-                        icon={<HistoryOutlined />}
-                        onClick={() => navigate('/tenant/history')}
-                        style={{
-                            height: '56px',
-                            borderRadius: '10px',
-                            fontSize: '15px',
-                            fontWeight: 500,
-                        }}
-                    >
-                        History
-                    </Button>
-                </Col>
-                <Col xs={24} sm={8}>
-                    <Button
-                        size="large"
-                        block
-                        icon={<UserOutlined />}
-                        onClick={() => navigate('/tenant/profile')}
-                        style={{
-                            height: '56px',
-                            borderRadius: '10px',
-                            fontSize: '15px',
-                            fontWeight: 500,
-                        }}
-                    >
-                        My Profile
-                    </Button>
-                </Col>
-            </Row>
-
-            {/* Statistics */}
-            <Row gutter={[16, 16]} style={{ marginBottom: 24 }}>
-                <Col xs={12} sm={12}>
-                    <MobileCard bodyStyle={{ padding: '20px' }}>
-                        <Statistic
-                            title={<span style={{ fontSize: '13px', fontWeight: 500 }}>Active Units</span>}
-                            value={units.length}
-                            suffix="units"
-                            valueStyle={{ color: '#1ecf49', fontSize: '28px', fontWeight: 700 }}
-                            prefix={<HomeOutlined />}
-                        />
-                    </MobileCard>
-                </Col>
-                <Col xs={12} sm={12}>
-                    <MobileCard bodyStyle={{ padding: '20px' }}>
-                        <Statistic
-                            title={<span style={{ fontSize: '13px', fontWeight: 500 }}>Total Spent</span>}
-                            value={totalSpent.toFixed(2)}
-                            prefix="KES"
-                            valueStyle={{ color: '#36ea98', fontSize: '28px', fontWeight: 700 }}
-                            suffix={<DollarOutlined />}
-                        />
-                    </MobileCard>
-                </Col>
-            </Row>
-
-            {/* Assigned Units */}
-            <div style={{ marginBottom: 24 }}>
-                <Title level={4} style={{ marginBottom: 16, fontSize: '18px' }}>
-                    My Units
-                </Title>
-                {!hasUnits ? (
-                    <MobileCard>
-                        <Empty
-                            description="No units assigned"
-                            image={Empty.PRESENTED_IMAGE_SIMPLE}
-                        />
-                    </MobileCard>
-                ) : (
-                    <Row gutter={[12, 12]}>
-                        {units.map((unit) => (
-                            <Col xs={24} sm={12} key={unit.unitId}>
-                                <MobileCard
-                                    hoverable
-                                    onClick={() => navigate('/tenant/buy-token', { state: { selectedUnit: unit.unitId } })}
-                                >
-                                    <div style={{ marginBottom: 12 }}>
-                                        <Space>
-                                            <HomeOutlined style={{ fontSize: '20px', color: '#1ecf49' }} />
-                                            <Text strong style={{ fontSize: '16px' }}>
-                                                {unit.unitLabel}
-                                            </Text>
-                                        </Space>
-                                        <Tag
-                                            color={unit.unitStatus === 'active' ? 'success' : 'default'}
-                                            style={{ marginLeft: 8 }}
-                                        >
-                                            {unit.unitStatus}
-                                        </Tag>
-                                    </div>
-                                    <div style={{ marginBottom: 8 }}>
-                                        <Text type="secondary" style={{ fontSize: '13px', display: 'block' }}>
-                                            Property: {unit.propertyName}
-                                        </Text>
-                                        <Text type="secondary" style={{ fontSize: '13px', display: 'block' }}>
-                                            Location: {unit.propertyLocation}
-                                        </Text>
-                                    </div>
-                                    <div style={{
-                                        padding: '10px',
-                                        background: '#f5f5f5',
-                                        borderRadius: '6px',
-                                        marginTop: 12
-                                    }}>
-                                        <Text type="secondary" style={{ fontSize: '12px' }}>
-                                            Meter Number
-                                        </Text>
-                                        <div>
-                                            <Text strong style={{ fontSize: '14px', fontFamily: 'monospace' }}>
-                                                {unit.meterNumber}
-                                            </Text>
-                                        </div>
-                                    </div>
-                                </MobileCard>
-                            </Col>
-                        ))}
-                    </Row>
-                )}
-            </div>
-
-            {/* Recent Top-ups */}
-            <div>
+        <TenantLayout>
+            <div style={{ padding: '20px' }}>
+                {/* Header: Greeting + Notification */}
                 <div style={{
                     display: 'flex',
                     justifyContent: 'space-between',
                     alignItems: 'center',
-                    marginBottom: 16
+                    marginBottom: 24
                 }}>
-                    <Title level={4} style={{ margin: 0, fontSize: '18px' }}>
-                        Recent Purchases
-                    </Title>
-                    {hasTopups && (
+                    <div>
+                        <Text type="secondary" style={{ fontSize: '14px' }}>Hello,</Text>
+                        <Title level={2} style={{ margin: 0, fontSize: '28px', fontWeight: 700 }}>
+                            {firstName} 👋
+                        </Title>
+                    </div>
+                    <Space>
                         <Button
-                            type="link"
-                            onClick={() => navigate('/tenant/history')}
-                            style={{ padding: 0 }}
-                        >
-                            View All
-                        </Button>
+                            icon={<QrcodeOutlined />}
+                            shape="circle"
+                            size="large"
+                            onClick={() => setIsScannerOpen(true)}
+                            style={{ border: 'none', boxShadow: '0 2px 8px rgba(0,0,0,0.05)' }}
+                        />
+                        <Badge count={unreadCount} size="small" offset={[-5, 5]}>
+                            <Button
+                                shape="circle"
+                                icon={<BellOutlined />}
+                                size="large"
+                                onClick={() => navigate('/tenant/notifications')}
+                                style={{ border: 'none', boxShadow: '0 2px 8px rgba(0,0,0,0.05)' }}
+                            />
+                        </Badge>
+                    </Space>
+                </div>
+
+                {/* Main Card: Green Gradient */}
+                <div style={{
+                    background: 'linear-gradient(135deg, #1ecf49 0%, #0eb53e 100%)',
+                    borderRadius: '20px',
+                    padding: '24px',
+                    color: 'white',
+                    marginBottom: 24,
+                    boxShadow: '0 10px 20px rgba(30, 207, 73, 0.3)',
+                    position: 'relative',
+                    overflow: 'hidden'
+                }}>
+                    {/* Decorative circles */}
+                    <div style={{
+                        position: 'absolute',
+                        top: -20,
+                        right: -20,
+                        width: 100,
+                        height: 100,
+                        borderRadius: '50%',
+                        background: 'rgba(255,255,255,0.1)'
+                    }} />
+                    <div style={{
+                        position: 'absolute',
+                        bottom: -30,
+                        left: -10,
+                        width: 80,
+                        height: 80,
+                        borderRadius: '50%',
+                        background: 'rgba(255,255,255,0.1)'
+                    }} />
+
+                    {primaryUnit ? (
+                        <>
+                            <div style={{ marginBottom: 16 }}>
+                                <Text style={{ color: 'rgba(255,255,255,0.8)', fontSize: '13px' }}>
+                                    Meter Number
+                                </Text>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                    <Title level={3} style={{ color: 'white', margin: 0, fontFamily: 'monospace', letterSpacing: '1px' }}>
+                                        {primaryUnit.meterNumber}
+                                    </Title>
+                                    <CopyOutlined
+                                        onClick={() => handleCopyToken(primaryUnit.meterNumber)}
+                                        style={{ cursor: 'pointer', color: 'rgba(255,255,255,0.8)' }}
+                                    />
+                                </div>
+                            </div>
+
+                            <div style={{ display: 'flex', gap: 24 }}>
+                                <div>
+                                    <Text style={{ color: 'rgba(255,255,255,0.8)', fontSize: '12px', display: 'block' }}>
+                                        Apartment
+                                    </Text>
+                                    <Text strong style={{ color: 'white', fontSize: '15px' }}>
+                                        {primaryUnit.propertyName}
+                                    </Text>
+                                </div>
+                                <div>
+                                    <Text style={{ color: 'rgba(255,255,255,0.8)', fontSize: '12px', display: 'block' }}>
+                                        Unit
+                                    </Text>
+                                    <Text strong style={{ color: 'white', fontSize: '15px' }}>
+                                        {primaryUnit.unitLabel}
+                                    </Text>
+                                </div>
+                            </div>
+                        </>
+                    ) : (
+                        <div style={{ textAlign: 'center', padding: '10px 0' }}>
+                            <Text style={{ color: 'white' }}>No unit assigned yet.</Text>
+                        </div>
                     )}
                 </div>
-                {!hasTopups ? (
-                    <MobileCard>
-                        <Empty
-                            description="No purchases yet"
-                            image={Empty.PRESENTED_IMAGE_SIMPLE}
+
+                {/* Quick Actions */}
+                <Text strong style={{ fontSize: '16px', marginBottom: 12, display: 'block' }}>Quick Actions</Text>
+                <Row gutter={[12, 12]} style={{ marginBottom: 30 }}>
+                    <Col span={12}>
+                        <div
+                            onClick={() => navigate('/tenant/buy-token')}
+                            style={{
+                                background: 'white',
+                                padding: '16px 8px',
+                                borderRadius: '16px',
+                                textAlign: 'center',
+                                boxShadow: '0 2px 10px rgba(0,0,0,0.03)',
+                                cursor: 'pointer'
+                            }}
                         >
-                            <Button
-                                type="primary"
-                                onClick={() => navigate('/tenant/buy-token')}
-                                style={{
-                                    borderRadius: '8px',
-                                    background: 'linear-gradient(135deg, #1ecf49 0%, #36ea98 100%)',
-                                    border: 'none'
-                                }}
-                            >
-                                Buy Your First Token
-                            </Button>
-                        </Empty>
-                    </MobileCard>
+                            <div style={{
+                                background: '#e6f9eb',
+                                color: '#1ecf49',
+                                width: 48,
+                                height: 48,
+                                borderRadius: '50%',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                margin: '0 auto 8px',
+                                fontSize: '20px'
+                            }}>
+                                <ThunderboltOutlined />
+                            </div>
+                            <Text style={{ fontSize: '12px', fontWeight: 500 }}>Buy Token</Text>
+                        </div>
+                    </Col>
+                    <Col span={12}>
+                        <div
+                            onClick={() => navigate('/tenant/history')}
+                            style={{
+                                background: 'white',
+                                padding: '16px 8px',
+                                borderRadius: '16px',
+                                textAlign: 'center',
+                                boxShadow: '0 2px 10px rgba(0,0,0,0.03)',
+                                cursor: 'pointer'
+                            }}
+                        >
+                            <div style={{
+                                background: '#fff7e6',
+                                color: '#fa8c16',
+                                width: 48,
+                                height: 48,
+                                borderRadius: '50%',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                margin: '0 auto 8px',
+                                fontSize: '20px'
+                            }}>
+                                <HistoryOutlined />
+                            </div>
+                            <Text style={{ fontSize: '12px', fontWeight: 500 }}>History</Text>
+                        </div>
+                    </Col>
+                    <Col span={12}>
+                        <div
+                            onClick={() => navigate('/tenant/profile')}
+                            style={{
+                                background: 'white',
+                                padding: '16px 8px',
+                                borderRadius: '16px',
+                                textAlign: 'center',
+                                boxShadow: '0 2px 10px rgba(0,0,0,0.03)',
+                                cursor: 'pointer'
+                            }}
+                        >
+                            <div style={{
+                                background: '#e6f7ff',
+                                color: '#1890ff',
+                                width: 48,
+                                height: 48,
+                                borderRadius: '50%',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                margin: '0 auto 8px',
+                                fontSize: '20px'
+                            }}>
+                                <UserOutlined />
+                            </div>
+                            <Text style={{ fontSize: '12px', fontWeight: 500 }}>Profile</Text>
+                        </div>
+                    </Col>
+                    <Col span={12}>
+                        <div
+                            onClick={() => {
+                                if (supportPhone) {
+                                    window.open(`https://wa.me/${supportPhone}`, '_blank');
+                                } else {
+                                    // Fallback if not configured
+                                    alert('Support number not configured yet.');
+                                }
+                            }}
+                            style={{
+                                background: 'white',
+                                padding: '16px 8px',
+                                borderRadius: '16px',
+                                textAlign: 'center',
+                                boxShadow: '0 2px 10px rgba(0,0,0,0.03)',
+                                cursor: 'pointer',
+                                opacity: supportPhone ? 1 : 0.6
+                            }}
+                        >
+                            <div style={{
+                                background: '#f0f5ff',
+                                color: '#25D366', // WhatsApp green
+                                width: 48,
+                                height: 48,
+                                borderRadius: '50%',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                margin: '0 auto 8px',
+                                fontSize: '20px'
+                            }}>
+                                <CustomerServiceOutlined />
+                            </div>
+                            <Text style={{ fontSize: '12px', fontWeight: 500 }}>Contact Support</Text>
+                        </div>
+                    </Col>
+                </Row>
+
+                {/* Recent Purchases */}
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+                    <Text strong style={{ fontSize: '16px' }}>Recent Tokens</Text>
+                    <Button type="link" onClick={() => navigate('/tenant/history')} style={{ padding: 0 }}>View All</Button>
+                </div>
+
+                {!hasTopups ? (
+                    <Empty description="No tokens yet" image={Empty.PRESENTED_IMAGE_SIMPLE} />
                 ) : (
-                    <Row gutter={[12, 12]}>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                         {topups.slice(0, 3).map((topup) => (
-                            <Col xs={24} key={topup.id}>
-                                <MobileCard bodyStyle={{ padding: '16px' }}>
+                            <div
+                                key={topup.id}
+                                onClick={() => setSelectedTopup(topup)}
+                                style={{
+                                    background: 'white',
+                                    padding: '16px',
+                                    borderRadius: '16px',
+                                    boxShadow: '0 2px 8px rgba(0,0,0,0.03)',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'space-between',
+                                    cursor: 'pointer',
+                                    transition: 'transform 0.1s',
+                                }}
+                                onMouseDown={(e) => e.currentTarget.style.transform = 'scale(0.98)'}
+                                onMouseUp={(e) => e.currentTarget.style.transform = 'scale(1)'}
+                                onMouseLeave={(e) => e.currentTarget.style.transform = 'scale(1)'}
+                            >
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                                     <div style={{
-                                        display: 'flex',
-                                        justifyContent: 'space-between',
-                                        alignItems: 'flex-start',
-                                        marginBottom: 12
+                                        background: '#f6ffed',
+                                        padding: '10px',
+                                        borderRadius: '10px',
+                                        color: '#52c41a'
                                     }}>
-                                        <div>
-                                            <Text strong style={{ fontSize: '16px', color: '#1ecf49' }}>
-                                                KES {parseFloat(topup.amount_paid).toFixed(2)}
-                                            </Text>
-                                            <Text type="secondary" style={{ display: 'block', fontSize: '13px' }}>
-                                                {topup.units?.label || 'Unit'}
-                                            </Text>
-                                        </div>
-                                        <Tag color="success">
-                                            {topup.futurise_status || 'Completed'}
-                                        </Tag>
+                                        <ThunderboltOutlined />
                                     </div>
-                                    <div style={{ marginBottom: 8 }}>
-                                        <Text type="secondary" style={{ fontSize: '12px' }}>
-                                            {new Date(topup.created_at).toLocaleDateString('en-US', {
-                                                year: 'numeric',
-                                                month: 'short',
-                                                day: 'numeric',
-                                                hour: '2-digit',
-                                                minute: '2-digit'
-                                            })}
+
+                                    <div style={{ display: 'flex', flexDirection: 'column' }}>
+                                        <Text strong style={{ fontSize: '14px', lineHeight: '1.2' }}>
+                                            {topup.units?.label}
+                                        </Text>
+                                        {topup.token && (
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 2 }}>
+                                                <Text code style={{
+                                                    margin: 0,
+                                                    fontSize: '15px',
+                                                    color: '#1ecf49',
+                                                    border: 'none',
+                                                    background: 'transparent',
+                                                    padding: 0,
+                                                    fontWeight: 600,
+                                                    fontFamily: 'monospace'
+                                                }}>
+                                                    {formatToken(topup.token.slice(0, 16))}...
+                                                </Text>
+                                            </div>
+                                        )}
+                                        <Text type="secondary" style={{ fontSize: '11px', lineHeight: '1.2' }}>
+                                            {new Date(topup.created_at).toLocaleDateString()}
                                         </Text>
                                     </div>
-                                    {topup.token && (
-                                        <div style={{
-                                            background: '#f9f9f9',
-                                            padding: '10px',
-                                            borderRadius: '6px',
-                                            border: '1px dashed #d9d9d9'
-                                        }}>
-                                            <Text
-                                                type="secondary"
-                                                style={{ fontSize: '11px', display: 'block', marginBottom: 4 }}
-                                            >
-                                                Token
-                                            </Text>
-                                            <Text
-                                                strong
-                                                style={{
-                                                    fontSize: '13px',
-                                                    fontFamily: 'monospace',
-                                                    wordBreak: 'break-all'
-                                                }}
-                                            >
-                                                {topup.token}
-                                            </Text>
-                                        </div>
-                                    )}
-                                </MobileCard>
-                            </Col>
+                                </div>
+                                <div style={{ textAlign: 'right' }}>
+                                    <Text strong style={{ display: 'block', color: '#1ecf49' }}>
+                                        KES {parseFloat(topup.amount_paid).toFixed(0)}
+                                    </Text>
+                                    <Tag color={topup.futurise_status === 'success' ? 'success' : 'warning'} style={{ margin: 0, fontSize: '10px' }}>
+                                        {topup.futurise_status || 'Pending'}
+                                    </Tag>
+                                </div>
+                            </div>
                         ))}
-                    </Row>
+                    </div>
                 )}
             </div>
-        </MainLayout>
+
+            <ScanModal
+                open={isScannerOpen}
+                onClose={() => setIsScannerOpen(false)}
+                onScan={handleScan}
+            />
+
+            <TokenReceiptModal
+                visible={!!selectedTopup}
+                onClose={() => setSelectedTopup(null)}
+                topup={selectedTopup}
+                tenantName={profile?.full_name}
+            />
+        </TenantLayout >
     );
 };
 
 export default TenantDashboard;
-

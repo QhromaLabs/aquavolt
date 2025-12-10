@@ -39,7 +39,7 @@ serve(async (req) => {
     }
 
     try {
-        const { meterNumber, amount, phoneNumber } = await req.json()
+        const { action = 'vend', ...params } = await req.json()
 
         const supabaseClient = createClient(
             Deno.env.get('SUPABASE_URL') ?? '',
@@ -53,62 +53,159 @@ serve(async (req) => {
             .eq('service_name', 'futurise')
             .single()
 
+        if (!creds) throw new Error('Futurise credentials not found')
         const { base_url, endpoints } = creds.credentials
 
         // Get valid auth token
         const authToken = await getAuthToken(supabaseClient)
 
-        // Call Futurise charge API
-        const chargeResponse = await fetch(`${base_url}${endpoints.charge}`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${authToken}`,
-            },
-            body: JSON.stringify({
-                meterNo: meterNumber,
-                money: amount,
-            }),
-        })
+        let responseData;
+        let endpointUrl;
+        let method = 'POST';
+        let bodyPayload = {};
 
-        const chargeData = await chargeResponse.json()
+        switch (action) {
+            case 'vend':
+                endpointUrl = `${base_url}${endpoints.charge}`;
+                bodyPayload = {
+                    meterNo: params.meterNumber,
+                    money: params.amount
+                };
+                break;
 
-        // Log the transaction
-        await supabaseClient.from('futurise_sync_log').insert({
-            sync_type: 'token_vend',
-            status: chargeData.code === 200 ? 'success' : 'failed',
-            items_synced: chargeData.code === 200 ? 1 : 0,
-            error_message: chargeData.msg,
-            request_data: { meterNumber, amount },
-            response_data: chargeData,
-        })
+            case 'check_meter':
+                endpointUrl = `${base_url}${endpoints.manage || '/api/v1/meter-recharge/meter-token/0'}`;
+                bodyPayload = {
+                    meterNo: params.meterNumber,
+                    method: 1,
+                    subClass: 1, // Clear Credit check
+                    value: 0
+                };
+                break;
 
-        if (chargeData.code !== 200) {
-            throw new Error(chargeData.msg || 'Token vending failed')
+            case 'maintenance_token':
+                endpointUrl = `${base_url}${endpoints.manage || '/api/v1/meter-recharge/meter-token/0'}`;
+                // method=1 is fixed for token generation usually
+                bodyPayload = {
+                    meterNo: params.meterNumber,
+                    method: 1,
+                    subClass: parseInt(params.subClass),
+                    value: parseFloat(params.value) || 0
+                };
+                break;
+
+            case 'get_regions':
+                // Note: base_url might include /api, and endpoints might be relative
+                // We assume getRegions endpoint is like /v1/archives/area
+                // If base_url is http://.../api, then just appending /v1/... works if base doesn't have it?
+                // Actually existing code in futuriseDev.js used `${PROXY_BASE_URL}/v1/archives/area`
+                // Let's assume we construct it safely.
+                // We'll use a hardcoded path if not in endpoints config, assuming standard API.
+                endpointUrl = `${base_url}/v1/archives/area`.replace('//v1', '/v1');
+                method = 'GET';
+                break;
+
+            default:
+                throw new Error(`Unknown action: ${action}`);
         }
 
-        // Extract token from response
-        const tokenData = chargeData.data
+        console.log(`Executing ${action} against ${endpointUrl}`);
+
+        const fetchOptions: any = {
+            method: method,
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${authToken}`
+            }
+        };
+
+        if (method === 'POST') {
+            fetchOptions.body = JSON.stringify(bodyPayload);
+        }
+
+        const apiRes = await fetch(endpointUrl, fetchOptions);
+
+        if (!apiRes.ok) {
+            const txt = await apiRes.text();
+            // Pass through 404/500 for meter check handling
+            if (action === 'check_meter' && (apiRes.status === 404 || apiRes.status === 500 || txt.includes('record not found'))) {
+                return new Response(
+                    JSON.stringify({ success: false, exists: false, message: 'Meter not found' }),
+                    { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
+                )
+            }
+            throw new Error(`Futurise API error: ${apiRes.status} ${txt}`);
+        }
+
+        const apiData = await apiRes.json();
+
+        // Log sync (maybe only for writes?)
+        if (['vend', 'maintenance_token'].includes(action)) {
+            await supabaseClient.from('futurise_sync_log').insert({
+                sync_type: action,
+                status: apiData.code === 200 ? 'success' : 'failed',
+                items_synced: apiData.code === 200 ? 1 : 0,
+                error_message: apiData.msg,
+                request_data: params,
+                response_data: apiData,
+            })
+        }
+
+        // Response Handling
+        if (action === 'vend') {
+            if (apiData.code !== 200) throw new Error(apiData.msg || 'Vending failed');
+            const d = apiData.data;
+            responseData = {
+                success: true,
+                token: d.form,
+                transactionId: d.flowNo,
+                requestId: apiData.requestId,
+                meterNumber: d.meterNo,
+                amount: params.amount,
+                units: d.value,
+                clearTime: d.clearTime,
+            };
+        } else if (action === 'check_meter') {
+            if (apiData.code === 200) {
+                responseData = { success: true, exists: true, message: 'Meter Validated', details: apiData.data };
+            } else {
+                responseData = { success: false, exists: false, message: apiData.msg };
+            }
+        } else if (action === 'get_regions') {
+            if (apiData.code === 200) {
+                responseData = { success: true, data: apiData.data || [] };
+            } else {
+                responseData = { success: false, message: apiData.msg };
+            }
+        } else if (action === 'maintenance_token') {
+            if (apiData.code === 200 && apiData.data) {
+                const d = apiData.data;
+                responseData = {
+                    success: true,
+                    token: d.form,
+                    meterNumber: d.meterNo,
+                    subClass: params.subClass,
+                    value: d.value,
+                    explain: d.explain,
+                    transactionId: d.flowNo,
+                    clearTime: d.clearTime,
+                    rawData: d
+                };
+            } else {
+                throw new Error(apiData.msg || 'Maintenance token generation failed');
+            }
+        }
 
         return new Response(
-            JSON.stringify({
-                success: true,
-                token: tokenData.form, // The actual token
-                transactionId: tokenData.flowNo,
-                requestId: chargeData.requestId,
-                meterNumber: tokenData.meterNo,
-                amount: amount,
-                units: tokenData.value,
-                clearTime: tokenData.clearTime,
-            }),
+            JSON.stringify(responseData),
             {
                 headers: { ...corsHeaders, 'Content-Type': 'application/json' },
                 status: 200,
             }
         )
-    } catch (error) {
-        console.error('Token vend error:', error)
 
+    } catch (error) {
+        console.error('Edge Function Error:', error)
         return new Response(
             JSON.stringify({
                 success: false,

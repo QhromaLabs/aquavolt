@@ -3,6 +3,8 @@ import { BrowserRouter, Routes, Route, Navigate, useNavigate } from 'react-route
 import { AuthProvider, useAuth } from './hooks/useAuth';
 import { RLSGuard } from './components/RLSGuard';
 import Login from './pages/auth/Login';
+import TenantLogin from './pages/auth/TenantLogin';
+import SignUp from './pages/auth/SignUp';
 import Unauthorized from './pages/auth/Unauthorized';
 
 // Admin pages
@@ -13,6 +15,7 @@ import UserManagement from './pages/admin/UserManagement';
 import TopupsLog from './pages/admin/TopupsLog';
 import MaintenanceConsole from './pages/admin/MaintenanceConsole';
 import CommissionEngine from './pages/admin/CommissionEngine';
+import AdminFinance from './pages/admin/Finance';
 import Settings from './pages/admin/Settings';
 import FuturiseSync from './pages/admin/FuturiseSync';
 
@@ -33,6 +36,8 @@ import TenantDashboard from './pages/tenant/Dashboard';
 import BuyToken from './pages/tenant/BuyToken';
 import TenantHistory from './pages/tenant/History';
 import TenantProfile from './pages/tenant/Profile';
+import TenantSetup from './pages/tenant/TenantSetup';
+import Notifications from './pages/common/Notifications';
 
 // Agent pages
 import AgentDashboard from './pages/agent/Dashboard';
@@ -44,6 +49,16 @@ function App() {
                 <Routes>
                     {/* Public routes */}
                     <Route path="/login" element={<Login />} />
+                    <Route path="/portal" element={<TenantLogin />} />
+                    <Route path="/signup" element={<SignUp />} />
+
+                    {/* Tenant Setup Route (potentially public or with minimal guard) */}
+                    <Route path="/tenant/setup" element={
+                        <RLSGuard>
+                            <TenantSetup />
+                        </RLSGuard>
+                    } />
+
                     <Route path="/unauthorized" element={<Unauthorized />} />
 
                     {/* Admin routes */}
@@ -59,6 +74,7 @@ function App() {
                                     <Route path="topups" element={<TopupsLog />} />
                                     <Route path="maintenance" element={<MaintenanceConsole />} />
                                     <Route path="commissions" element={<CommissionEngine />} />
+                                    <Route path="finance" element={<AdminFinance />} />
                                     <Route path="futurise-sync" element={<FuturiseSync />} />
                                     <Route path="settings" element={<Settings />} />
                                     <Route path="*" element={<Navigate to="/admin/dashboard" replace />} />
@@ -109,6 +125,7 @@ function App() {
                                     <Route path="buy-token" element={<BuyToken />} />
                                     <Route path="history" element={<TenantHistory />} />
                                     <Route path="profile" element={<TenantProfile />} />
+                                    <Route path="notifications" element={<Notifications />} />
                                     <Route path="*" element={<Navigate to="/tenant/dashboard" replace />} />
                                 </Routes>
                             </RLSGuard>

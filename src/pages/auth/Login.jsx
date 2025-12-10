@@ -60,16 +60,12 @@ const Login = () => {
                 }}>
                     <div style={{
                         display: 'inline-block',
-                        padding: '12px',
-                        background: 'linear-gradient(135deg, #1ecf49 0%, #36ea98 100%)',
-                        borderRadius: '16px',
                         marginBottom: 16,
-                        boxShadow: '0 4px 12px rgba(30, 207, 73, 0.3)'
                     }}>
                         <img
-                            src="/logowhite.png"
+                            src="/Logo.png"
                             alt="Aquavolt Logo"
-                            style={{ height: 50, display: 'block' }}
+                            style={{ height: 64, display: 'block' }}
                         />
                     </div>
                     <Title level={2} style={{
@@ -157,6 +153,16 @@ const Login = () => {
                             Sign In
                         </Button>
                     </Form.Item>
+
+                    <div style={{ marginTop: '20px', textAlign: 'center' }}>
+                        <Button type="link" onClick={() => navigate('/portal')} style={{ color: '#1ecf49' }}>
+                            Are you a Tenant? Tenant Login
+                        </Button>
+                        <br />
+                        <Button type="link" onClick={() => navigate('/signup')} style={{ color: '#8c8c8c' }}>
+                            Create Account
+                        </Button>
+                    </div>
                 </Form>
 
                 <div style={{
@@ -165,8 +171,11 @@ const Login = () => {
                     paddingTop: 24,
                     borderTop: '1px solid #f0f0f0'
                 }}>
+                    <Text type="secondary" style={{ fontSize: 13, display: 'block' }}>
+                        © 2025 Aquavolt. All rights reserved.
+                    </Text>
                     <Text type="secondary" style={{ fontSize: 13 }}>
-                        © 2024 Aquavolt. All rights reserved.
+                        Powered by Qhroma Labs
                     </Text>
                 </div>
             </Card>

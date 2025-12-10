@@ -13,6 +13,8 @@ import {
     FileTextOutlined,
     ThunderboltOutlined,
     ApiOutlined,
+    RiseOutlined,
+    GlobalOutlined
 } from '@ant-design/icons';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
@@ -68,6 +70,7 @@ const MainLayout = ({ children }) => {
                 { key: '/admin/topups', icon: <FileTextOutlined />, label: 'Top-Ups Log' },
                 { key: '/admin/maintenance', icon: <ToolOutlined />, label: 'Maintenance Console' },
                 { key: '/admin/commissions', icon: <DollarOutlined />, label: 'Commission Engine' },
+                { key: '/admin/finance', icon: <RiseOutlined />, label: 'Finance' },
                 { key: '/admin/futurise-sync', icon: <ApiOutlined />, label: 'Futurise Sync' },
                 { key: '/admin/settings', icon: <SettingOutlined />, label: 'Settings' },
             ];

@@ -21,8 +21,11 @@ import {
     BulbOutlined,
     SyncOutlined,
     ApiOutlined,
-    ThunderboltOutlined
+    ThunderboltOutlined,
+    CheckCircleOutlined,
+    CloseCircleOutlined
 } from '@ant-design/icons';
+import { futuriseDev } from '../../lib/futuriseDev';
 import MainLayout from '../../components/Layout/MainLayout';
 import { supabase } from '../../lib/supabase';
 
@@ -35,6 +38,11 @@ const UnitsMatrix = () => {
     const [modalVisible, setModalVisible] = useState(false);
     const [editingUnit, setEditingUnit] = useState(null);
     const [form] = Form.useForm();
+
+    // Validation State
+    const [validating, setValidating] = useState(false);
+    const [validationStatus, setValidationStatus] = useState(null); // null, 'success', 'error'
+    const [meterDetails, setMeterDetails] = useState(null);
 
     useEffect(() => {
         fetchUnits();
@@ -82,6 +90,8 @@ const UnitsMatrix = () => {
     const handleCreate = () => {
         form.resetFields();
         setEditingUnit(null);
+        setValidationStatus(null);
+        setMeterDetails(null);
         setModalVisible(true);
     };
 
@@ -91,6 +101,7 @@ const UnitsMatrix = () => {
             ...unit,
             current_balance: parseFloat(unit.current_balance || 0),
         });
+        setValidationStatus(null); // Reset on open
         setModalVisible(true);
     };
 
@@ -111,6 +122,12 @@ const UnitsMatrix = () => {
     };
 
     const handleSubmit = async (values) => {
+        // Enforce validation? For now just optional but recommended
+        if (validationStatus === 'error') {
+            message.warning('Please fix the invalid meter number before saving.');
+            return;
+        }
+
         try {
             if (editingUnit) {
                 const { error } = await supabase
@@ -343,8 +360,50 @@ const UnitsMatrix = () => {
                         <Input
                             placeholder="e.g., 0128244428552"
                             style={{ fontFamily: 'monospace' }}
+                            onChange={() => setValidationStatus(null)} // Reset status on edit
                         />
                     </Form.Item>
+
+                    <div style={{ marginBottom: 24, marginTop: -12 }}>
+                        <Button
+                            type="dashed"
+                            onClick={async () => {
+                                const meterNo = form.getFieldValue('meter_number');
+                                if (!meterNo) {
+                                    message.error('Enter a meter number first');
+                                    return;
+                                }
+                                setValidating(true);
+                                const res = await futuriseDev.checkMeter(meterNo);
+                                setValidating(false);
+
+                                if (res.success && res.exists) {
+                                    setValidationStatus('success');
+                                    setMeterDetails(res.details);
+                                    message.success('Meter Validated! Connected to ' + (res.details?.meterNo || 'device'));
+                                    // Auto-fill tariff if available?
+                                } else {
+                                    setValidationStatus('error');
+                                    setMeterDetails(null);
+                                    message.error('Meter Validation Failed: ' + res.message);
+                                }
+                            }}
+                            loading={validating}
+                            icon={validationStatus === 'success' ? <CheckCircleOutlined style={{ color: '#52c41a' }} /> : (validationStatus === 'error' ? <CloseCircleOutlined style={{ color: '#ff4d4f' }} /> : <ApiOutlined />)}
+                            style={{
+                                width: '100%',
+                                borderColor: validationStatus === 'success' ? '#52c41a' : (validationStatus === 'error' ? '#ff4d4f' : undefined),
+                                color: validationStatus === 'success' ? '#52c41a' : (validationStatus === 'error' ? '#ff4d4f' : undefined)
+                            }}
+                        >
+                            {validationStatus === 'success' ? 'Meter Verified' : (validationStatus === 'error' ? 'Invalid Meter - Check Number' : 'Validate with Futurise')}
+                        </Button>
+                        {meterDetails && (
+                            <Text type="secondary" style={{ fontSize: '12px', display: 'block', marginTop: 4, textAlign: 'center' }}>
+                                Found: {meterDetails.meterNo} (State: {meterDetails.state})
+                            </Text>
+                        )}
+                    </div>
 
                     <Form.Item
                         name="current_balance"

@@ -19,7 +19,8 @@ import {
     DeleteOutlined,
     HomeOutlined,
     SyncOutlined,
-    ApiOutlined
+    ApiOutlined,
+    UserOutlined
 } from '@ant-design/icons';
 import MainLayout from '../../components/Layout/MainLayout';
 import { supabase } from '../../lib/supabase';
@@ -29,6 +30,8 @@ const { TextArea } = Input;
 
 const PropertiesManagement = () => {
     const [properties, setProperties] = useState([]);
+    const [agents, setAgents] = useState([]);
+    const [landlords, setLandlords] = useState([]);
     const [loading, setLoading] = useState(false);
     const [modalVisible, setModalVisible] = useState(false);
     const [editingProperty, setEditingProperty] = useState(null);
@@ -36,14 +39,50 @@ const PropertiesManagement = () => {
 
     useEffect(() => {
         fetchProperties();
+        fetchUsers();
     }, []);
+
+    const fetchUsers = async () => {
+        try {
+            // Fetch Agents
+            const { data: agentData, error: agentError } = await supabase
+                .from('profiles')
+                .select('id, full_name, email')
+                .eq('role', 'agent');
+
+            if (agentError) throw agentError;
+            setAgents(agentData || []);
+
+            // Fetch Landlords
+            const { data: landlordData, error: landlordError } = await supabase
+                .from('profiles')
+                .select('id, full_name, email')
+                .eq('role', 'landlord');
+
+            if (landlordError) throw landlordError;
+            setLandlords(landlordData || []);
+
+        } catch (error) {
+            console.error('Error fetching users:', error);
+        }
+    };
 
     const fetchProperties = async () => {
         setLoading(true);
         try {
             const { data, error } = await supabase
                 .from('properties')
-                .select('*')
+                .select(`
+                    *,
+                    agent:agent_id (
+                        full_name,
+                        email
+                    ),
+                    landlord:landlord_id (
+                        full_name,
+                        email
+                    )
+                `)
                 .order('created_at', { ascending: false });
 
             if (error) throw error;
@@ -86,11 +125,26 @@ const PropertiesManagement = () => {
 
     const handleSubmit = async (values) => {
         try {
+            // If no landlord is selected, default to current user (if creating) or keep existing?
+            // Ideally, we force selection or default to current user id if they are a landlord?
+            // For now, if values.landlord_id is undefined, we might check who created it.
+            // But let's rely on the form value.
+
+            const payload = { ...values };
+            const { data: { user } } = await supabase.auth.getUser();
+
+            if (!payload.landlord_id) {
+                // If not specified, default to creator if creating new
+                if (!editingProperty) {
+                    payload.landlord_id = user.id;
+                }
+            }
+
             if (editingProperty) {
                 // Update existing property
                 const { error } = await supabase
                     .from('properties')
-                    .update(values)
+                    .update(payload)
                     .eq('id', editingProperty.id);
 
                 if (error) throw error;
@@ -99,7 +153,7 @@ const PropertiesManagement = () => {
                 // Create new property
                 const { error } = await supabase
                     .from('properties')
-                    .insert([values]);
+                    .insert([payload]);
 
                 if (error) throw error;
                 message.success('Property created successfully');
@@ -130,6 +184,27 @@ const PropertiesManagement = () => {
             title: 'Location',
             dataIndex: 'location',
             key: 'location',
+        },
+        {
+            title: 'Owner / Landlord',
+            key: 'landlord',
+            render: (_, record) => record.landlord ? (
+                <Space>
+                    <UserOutlined />
+                    <Text>{record.landlord.full_name}</Text>
+                </Space>
+            ) : (
+                <Text type="secondary">Self (Admin)</Text>
+            )
+        },
+        {
+            title: 'Agent',
+            key: 'agent',
+            render: (_, record) => record.agent ? (
+                <Tag color="purple">{record.agent.full_name}</Tag>
+            ) : (
+                <Text type="secondary">-</Text>
+            )
         },
         {
             title: 'Futurise Region',
@@ -270,27 +345,51 @@ const PropertiesManagement = () => {
                     </Form.Item>
 
                     <Form.Item
-                        name="description"
-                        label="Description"
+                        name="landlord_id"
+                        label="Owner / Landlord"
+                        tooltip="The owner of this property. They will see this property in their dashboard."
                     >
-                        <TextArea
-                            rows={3}
-                            placeholder="Optional description about the property"
-                        />
+                        <Select
+                            placeholder="Select a landlord"
+                            allowClear
+                            showSearch
+                            optionFilterProp="children"
+                        >
+                            {landlords.map(user => (
+                                <Select.Option key={user.id} value={user.id}>
+                                    {user.full_name} ({user.email})
+                                </Select.Option>
+                            ))}
+                        </Select>
+                    </Form.Item>
+
+                    <Form.Item
+                        name="agent_id"
+                        label="Assigned Agent"
+                        tooltip="The agent responsible for this property (receives commissions)"
+                    >
+                        <Select
+                            placeholder="Select an agent"
+                            allowClear
+                            showSearch
+                            optionFilterProp="children"
+                        >
+                            {agents.map(agent => (
+                                <Select.Option key={agent.id} value={agent.id}>
+                                    {agent.full_name} ({agent.email})
+                                </Select.Option>
+                            ))}
+                        </Select>
                     </Form.Item>
 
                     <Form.Item
                         name="futurise_region_name"
                         label="Futurise Region"
-                        tooltip="Map this property to a Futurise region (1:1 mapping)"
+                        tooltip="Map this property to a Futurise region (e.g., 'head office')"
                     >
-                        <Select
-                            placeholder="Select Futurise region"
+                        <Input
+                            placeholder="e.g., head office"
                             allowClear
-                            options={[
-                                { value: 'head office', label: 'head office' },
-                                // More regions can be loaded from Futurise API
-                            ]}
                         />
                     </Form.Item>
 
