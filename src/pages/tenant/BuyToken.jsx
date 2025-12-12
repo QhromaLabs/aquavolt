@@ -3,6 +3,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import {
     Form,
     Select,
+    Input,
     InputNumber,
     Button,
     Typography,
@@ -47,12 +48,40 @@ const BuyToken = () => {
     const [showSuccessModal, setShowSuccessModal] = useState(false);
 
     // M-Pesa & Dev Integration
-    // Phone state, defaulting to test number if available or empty
-    const [phoneNumber, setPhoneNumber] = useState('254712345678');
+    const [phoneNumber, setPhoneNumber] = useState('');
     const [paymentStatus, setPaymentStatus] = useState('idle'); // idle, pushing, waiting, vended, error
     const [serviceFeePercent, setServiceFeePercent] = useState(5); // Default 5%
 
     const quickAmounts = [100, 200, 500, 1000, 2000, 5000];
+
+    // Fetch tenant phone number
+    useEffect(() => {
+        const fetchTenantPhone = async () => {
+            const { data: { user } } = await supabase.auth.getUser();
+            if (user) {
+                const { data: profile } = await supabase
+                    .from('profiles')
+                    .select('phone')
+                    .eq('id', user.id)
+                    .single();
+
+                if (profile?.phone) {
+                    // Normalize phone to 254 format
+                    let normalizedPhone = profile.phone.replace(/\s+/g, '');
+                    if (normalizedPhone.startsWith('0')) {
+                        normalizedPhone = '254' + normalizedPhone.substring(1);
+                    } else if (normalizedPhone.startsWith('+254')) {
+                        normalizedPhone = normalizedPhone.substring(1);
+                    } else if (!normalizedPhone.startsWith('254')) {
+                        normalizedPhone = '254' + normalizedPhone;
+                    }
+                    setPhoneNumber(normalizedPhone);
+                    form.setFieldsValue({ phoneNumber: normalizedPhone });
+                }
+            }
+        };
+        fetchTenantPhone();
+    }, []);
 
     useEffect(() => {
         const fetchServiceFee = async () => {
@@ -95,17 +124,17 @@ const BuyToken = () => {
     const handlePurchase = async (values) => {
         setPurchasing(true);
         setPaymentStatus('pushing');
+
         try {
             const selectedUnitData = units.find(u => u.unitId === values.unit_id);
             if (!selectedUnitData) throw new Error('Unit not found');
-            if (!selectedUnitData.meterNumber) throw new Error('Meter number missing');
 
             const phone = values.phoneNumber?.toString() || phoneNumber;
+            const { data: { user } } = await supabase.auth.getUser();
 
-            // [REAL FLOW] Use Local Proxy (Futurise API)
-            // 1. STK Push (Safaricom Sandbox)
+            // 1. Send STK Push - this creates mpesa_payments record
             message.loading({ content: 'Sending M-Pesa STK Push...', key: 'mpesa' });
-            const stkRes = await futuriseDev.sendStkPush(phone, values.amount);
+            const stkRes = await futuriseDev.sendStkPush(phone, values.amount, values.unit_id, user.id);
 
             if (!stkRes.success) {
                 message.error({ content: 'STK Push Failed: ' + stkRes.message, key: 'mpesa' });
@@ -113,75 +142,97 @@ const BuyToken = () => {
                 throw new Error(stkRes.message);
             }
 
-            message.success({ content: 'STK Push Sent! Enter PIN.', key: 'mpesa', duration: 4 });
-            setPaymentStatus('waiting');
-
-            // Simulate Payment Wait (5 seconds)
-            await new Promise(resolve => setTimeout(resolve, 5000));
-
-            // 2. Vend Token (Futurise API via Proxy)
-            message.loading({ content: 'Verifying Payment & Vending Token...', key: 'vend' });
-
-            const fee = values.amount * (serviceFeePercent / 100);
-            const netAmount = values.amount - fee;
-
-            // Auto-auth handles token if needed
-            const vendRes = await futuriseDev.vendToken(selectedUnitData.meterNumber, netAmount, null);
-
-            if (!vendRes.success) {
-                message.error({ content: 'Vending Failed: ' + vendRes.message, key: 'vend' });
-                setPaymentStatus('error');
-                throw new Error(vendRes.message);
+            const checkoutRequestId = stkRes.checkoutRequestId;
+            if (!checkoutRequestId) {
+                throw new Error('No checkout request ID received');
             }
 
-            message.success({ content: 'Token Generated!', key: 'vend' });
+            message.success({ content: 'STK Push Sent! Enter your M-Pesa PIN', key: 'mpesa', duration: 3 });
+            setPaymentStatus('waiting');
+
+            // 2. Poll for payment confirmation - M-Pesa callback will handle vending
+            message.loading({ content: 'Waiting for payment confirmation...', key: 'payment_wait' });
+
+            const maxAttempts = 60; // Poll for up to 60 seconds (60 attempts x 1 second)
+            let attempts = 0;
+            let paymentConfirmed = false;
+            let topupRecord = null;
+
+            while (attempts < maxAttempts && !paymentConfirmed) {
+                await new Promise(resolve => setTimeout(resolve, 1000)); // Wait 1 second between polls
+                attempts++;
+
+                // Check payment status in database
+                const { data: payment, error: paymentError } = await supabase
+                    .from('mpesa_payments')
+                    .select('*, topup:topups(*)')
+                    .eq('checkout_request_id', checkoutRequestId)
+                    .single();
+
+                if (paymentError) {
+                    console.warn('Payment check error:', paymentError);
+                    continue;
+                }
+
+                if (payment) {
+                    console.log(`Poll attempt ${attempts}: Payment status = ${payment.status}, Token vended = ${payment.token_vended}`);
+
+                    if (payment.status === 'success' && payment.token_vended && payment.topup_id) {
+                        // Payment confirmed and token vended by callback!
+                        paymentConfirmed = true;
+
+                        // Fetch the topup record with proper nested joins
+                        const { data: topup, error: topupError } = await supabase
+                            .from('topups')
+                            .select(`
+                                *,
+                                units (
+                                    label,
+                                    meter_number,
+                                    properties (
+                                        name
+                                    )
+                                )
+                            `)
+                            .eq('id', payment.topup_id)
+                            .single();
+
+                        if (topupError) {
+                            console.error('Error fetching topup record:', topupError);
+                        }
+
+                        if (!topupError && topup) {
+                            topupRecord = topup;
+                        }
+                        break;
+                    } else if (payment.status === 'failed' || payment.status === 'cancelled' || payment.status === 'timeout') {
+                        // Payment failed
+                        throw new Error(payment.result_desc || `Payment ${payment.status}`);
+                    }
+                }
+            }
+
+            if (!paymentConfirmed) {
+                throw new Error('Payment confirmation timeout. Please check your purchase history.');
+            }
+
+            message.success({ content: 'Payment Confirmed! Token Generated!', key: 'payment_wait' });
             setPaymentStatus('vended');
 
-            // Map response
-            const responseData = {
-                success: true,
-                amount: values.amount,
-                netAmount: netAmount,
-                units: parseFloat(vendRes.units || 0),
-                token: vendRes.token,
-                transactionId: vendRes.transactionId,
-                requestId: 'LOC-DEV-' + Date.now().toString().slice(-6),
-                meterNumber: vendRes.meterNumber,
-                clearTime: vendRes.clearTime
-            };
+            // Display success modal with the vended token
+            if (topupRecord) {
+                setTokenResult({
+                    token: topupRecord.token,
+                    amount_paid: topupRecord.amount_paid,
+                    amount_vended: topupRecord.units_kwh, // Display actual kWh units
+                    fee_amount: topupRecord.fee_amount,
+                    meter_number: selectedUnitData.meterNumber,
+                    unit: selectedUnitData,
+                    mpesa_receipt: topupRecord.mpesa_receipt_number,
+                });
+                setShowSuccessModal(true);
+            }
 
-            // Save to database
-            const { data: topupData, error: topupError } = await supabase
-                .from('topups')
-                .insert([{
-                    unit_id: values.unit_id,
-                    tenant_id: (await supabase.auth.getUser()).data.user.id,
-                    amount_paid: responseData.amount,
-                    amount_vended: responseData.units,
-                    fee_amount: responseData.amount - responseData.netAmount,
-                    payment_channel: 'mpesa',
-                    token: responseData.token,
-                    futurise_status: 'success',
-                    futurise_message: 'Token generated successfully',
-                    futurise_transaction_id: responseData.transactionId,
-                    futurise_flow_no: responseData.transactionId,
-                    futurise_request_id: responseData.requestId
-                }])
-                .select()
-                .single();
-
-            if (topupError) throw topupError;
-
-            setTokenResult({
-                token: responseData.token,
-                amount_paid: responseData.amount,
-                amount_vended: responseData.units,
-                fee_amount: 0,
-                meter_number: selectedUnitData.meterNumber,
-                unit: selectedUnitData,
-                clearTime: responseData.clearTime,
-            });
-            setShowSuccessModal(true);
             form.resetFields();
             setSelectedAmount(null);
             setCustomAmount(null);
@@ -301,7 +352,7 @@ const BuyToken = () => {
                             name="amount"
                             rules={[
                                 { required: true, message: 'Please enter an amount' },
-                                { type: 'number', min: 50, message: 'Minimum KES 50' }
+                                { type: 'number', min: 10, message: 'Minimum KES 10' }
                             ]}
                             style={{ marginBottom: 0 }}
                         >
@@ -315,7 +366,7 @@ const BuyToken = () => {
                                     padding: '4px 0'
                                 }}
                                 onChange={handleCustomAmountChange}
-                                min={50}
+                                min={10}
                                 type="number"
                             />
                         </Form.Item>
@@ -375,17 +426,33 @@ const BuyToken = () => {
                             name="phoneNumber"
                             initialValue={phoneNumber}
                             rules={[
-                                { required: true, message: 'Please enter phone' },
-                                { pattern: /^254\d{9}$/, message: 'Must start with 254...' }
+                                { required: true, message: 'Please enter phone number' },
+                                {
+                                    validator: (_, value) => {
+                                        if (!value) return Promise.reject();
+                                        const normalized = value.replace(/\s+/g, '');
+                                        if (normalized.match(/^(254|07)\d{9}$/)) {
+                                            return Promise.resolve();
+                                        }
+                                        return Promise.reject('Enter 254XXXXXXXXX or 07XXXXXXXX');
+                                    }
+                                }
                             ]}
                             style={{ marginBottom: 0 }}
                         >
-                            <InputNumber
+                            <Input
                                 size="large"
-                                placeholder="2547..."
+                                placeholder="254712345678 or 0712345678"
                                 style={{ width: '100%', borderRadius: '10px' }}
-                                onChange={(val) => setPhoneNumber(val?.toString())}
-                                controls={false}
+                                onChange={(e) => {
+                                    let value = e.target.value.replace(/\s+/g, '');
+                                    // Auto-convert 07 to 254
+                                    if (value.startsWith('07') && value.length === 10) {
+                                        value = '254' + value.substring(1);
+                                        form.setFieldsValue({ phoneNumber: value });
+                                    }
+                                    setPhoneNumber(value);
+                                }}
                                 prefix={<PhoneOutlined style={{ color: '#bfbfbf', marginRight: 8 }} />}
                             />
                         </Form.Item>
@@ -411,7 +478,7 @@ const BuyToken = () => {
                                 size="large"
                                 block
                                 loading={purchasing}
-                                disabled={!selectedUnit || getAmount() < 50}
+                                disabled={!selectedUnit || getAmount() < 10}
                                 style={{
                                     height: '56px',
                                     borderRadius: '16px',

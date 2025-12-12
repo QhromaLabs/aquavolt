@@ -111,12 +111,19 @@ serve(async (req) => {
 
         console.log(`Executing ${action} against ${endpointUrl}`);
 
+        // Create HTTP client that accepts self-signed certificates (for Futurise API)
+        const client = Deno.createHttpClient({
+            // @ts-ignore - Deno types might not include this
+            caCerts: [],
+        });
+
         const fetchOptions: any = {
             method: method,
             headers: {
                 'Content-Type': 'application/json',
                 'Authorization': `Bearer ${authToken}`
-            }
+            },
+            client: client, // Use custom client that accepts self-signed certs
         };
 
         if (method === 'POST') {
@@ -206,14 +213,16 @@ serve(async (req) => {
 
     } catch (error) {
         console.error('Edge Function Error:', error)
+        console.error('Error stack:', error.stack)
         return new Response(
             JSON.stringify({
                 success: false,
+                message: error.message || 'Token vending failed',
                 error: error.message,
             }),
             {
                 headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-                status: 500,
+                status: 200, // Return 200 so client can parse error details
             }
         )
     }

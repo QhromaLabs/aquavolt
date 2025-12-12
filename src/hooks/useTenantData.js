@@ -80,13 +80,17 @@ export const useTenantData = () => {
                     fee_amount,
                     payment_channel,
                     token,
+                    units_kwh,
                     futurise_status,
                     futurise_message,
                     created_at,
                     unit_id,
                     units (
                         label,
-                        meter_number
+                        meter_number,
+                        properties (
+                            name
+                        )
                     )
                 `)
                 .eq('tenant_id', user.id)

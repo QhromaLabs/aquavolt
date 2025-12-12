@@ -13,7 +13,7 @@ serve(async (req) => {
 
     try {
         // 1. Parse Request
-        const { phoneNumber, amount, passkey } = await req.json()
+        const { phoneNumber, amount, passkey, unitId, tenantId } = await req.json()
 
         if (!phoneNumber || !amount) {
             throw new Error('Phone number and amount are required')
@@ -36,26 +36,37 @@ serve(async (req) => {
             throw new Error('Failed to fetch M-Pesa credentials from database')
         }
 
-        // Allow passing passkey from client safely (if temporarily testing) or fallback to DB
         const config = creds.credentials
         const CONSUMER_KEY = config.consumer_key
         const CONSUMER_SECRET = config.consumer_secret
         const SHORTCODE = config.shortcode
         const PASSKEY = passkey || config.passkey
-        // Note: Production logic should strictly use DB passkey, but for "it works when I provide key" flow, we allow override.
 
         if (!CONSUMER_KEY || !CONSUMER_SECRET || !SHORTCODE || !PASSKEY) {
             throw new Error('Missing M-Pesa configuration (Key, Secret, Shortcode, or Passkey)')
         }
 
-        // 4. Get Access Token from Safaricom
-        const auth = btoa(`${CONSUMER_KEY}:${CONSUMER_SECRET}`)
-        const tokenRes = await fetch('https://sandbox.safaricom.co.ke/oauth/v1/generate?grant_type=client_credentials', {
+        // Debug: Log credentials (first/last 4 chars only for security)
+        console.log('M-Pesa Config:', {
+            key: `${CONSUMER_KEY.substring(0, 4)}...${CONSUMER_KEY.substring(CONSUMER_KEY.length - 4)}`,
+            secret: `${CONSUMER_SECRET.substring(0, 4)}...${CONSUMER_SECRET.substring(CONSUMER_SECRET.length - 4)}`,
+            shortcode: SHORTCODE,
+            passkey: `${PASSKEY.substring(0, 8)}...`
+        })
+
+        // 4. Get Access Token from Safaricom (PRODUCTION)
+        const auth = btoa(`${CONSUMER_KEY.trim()}:${CONSUMER_SECRET.trim()}`)
+        console.log('Auth header (first 20 chars):', auth.substring(0, 20))
+
+        const tokenRes = await fetch('https://api.safaricom.co.ke/oauth/v1/generate?grant_type=client_credentials', {
             headers: { 'Authorization': `Basic ${auth}` }
         })
 
+        console.log('Safaricom OAuth Response Status:', tokenRes.status)
+
         if (!tokenRes.ok) {
             const txt = await tokenRes.text()
+            console.error('Safaricom OAuth Error:', txt)
             throw new Error(`Failed to get access token: ${tokenRes.status} ${txt}`)
         }
 
@@ -65,9 +76,6 @@ serve(async (req) => {
         // 5. Generate Password & Timestamp
         // Force Nairobi Time (UTC+3) logic manually to be safe in Deno environment
         const now = new Date()
-        // Add 3 hours in milliseconds for Nairobi offset from UTC, assuming Deno runs in UTC.
-        // Better: use ISO string and parse? No, simplest is offset.
-        // Actually, let's just construct it carefully.
         const utc = now.getTime() + (now.getTimezoneOffset() * 60000); // UTC time in ms
         const nairobiOffset = 3 * 60 * 60 * 1000;
         const nairobiDate = new Date(utc + nairobiOffset);
@@ -86,8 +94,8 @@ serve(async (req) => {
         if (formattedPhone.startsWith('+')) formattedPhone = formattedPhone.slice(1)
         if (formattedPhone.startsWith('0')) formattedPhone = '254' + formattedPhone.slice(1)
 
-        // 7. Send STK Push
-        const stkUrl = 'https://sandbox.safaricom.co.ke/mpesa/stkpush/v1/processrequest'
+        // 7. Send STK Push (PRODUCTION)
+        const stkUrl = 'https://api.safaricom.co.ke/mpesa/stkpush/v1/processrequest'
         const stkRes = await fetch(stkUrl, {
             method: 'POST',
             headers: {
@@ -103,7 +111,7 @@ serve(async (req) => {
                 "PartyA": formattedPhone,
                 "PartyB": SHORTCODE,
                 "PhoneNumber": formattedPhone,
-                "CallBackURL": "https://jfkvsducukwgqsljoisw.supabase.co/functions/v1/mpesa-callback",
+                "CallBackURL": `${Deno.env.get('SUPABASE_URL')}/functions/v1/mpesa-callback`,
                 "AccountReference": "AquaVolt",
                 "TransactionDesc": "Token Purchase"
             })
@@ -112,25 +120,42 @@ serve(async (req) => {
         const stkData = await stkRes.json()
         console.log('Safaricom Response:', JSON.stringify(stkData))
 
-        // Log transaction attempt
-        await supabaseClient.from('futurise_sync_log').insert({
-            sync_type: 'mpesa_stk_push',
-            status: stkData.ResponseCode === '0' ? 'success' : 'failed',
-            items_synced: 1,
-            request_data: { phone: formattedPhone, amount },
-            response_data: stkData,
-            error_message: stkData.ResponseDescription
-        })
-
+        // 8. Create payment tracking record
         if (stkData.ResponseCode === '0') {
+            const { data: paymentRecord, error: paymentError } = await supabaseClient
+                .from('mpesa_payments')
+                .insert({
+                    checkout_request_id: stkData.CheckoutRequestID,
+                    merchant_request_id: stkData.MerchantRequestID,
+                    phone_number: formattedPhone,
+                    amount: amount,
+                    unit_id: unitId || null,
+                    tenant_id: tenantId || null,
+                    status: 'pending'
+                })
+                .select()
+                .single()
+
+            if (paymentError) {
+                console.error('Failed to create payment record:', paymentError)
+                // Don't fail the request, STK push was successful
+            } else {
+                console.log('Payment tracking record created:', paymentRecord.id)
+            }
+
             return new Response(
-                JSON.stringify({ success: true, data: stkData }),
+                JSON.stringify({
+                    success: true,
+                    data: stkData,
+                    checkoutRequestId: stkData.CheckoutRequestID // Return for frontend polling
+                }),
                 { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
             )
         } else {
+            // Return 200 even on error so client can see the message body (Supabase functions throw on 400)
             return new Response(
                 JSON.stringify({ success: false, message: stkData.errorMessage || 'STK Push Failed', data: stkData }),
-                { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
+                { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
             )
         }
 
@@ -138,7 +163,7 @@ serve(async (req) => {
         console.error('M-Pesa Edge Function Error:', error)
         return new Response(
             JSON.stringify({ success: false, message: error.message }),
-            { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500 }
+            { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 } // Return 200 here too
         )
     }
 })

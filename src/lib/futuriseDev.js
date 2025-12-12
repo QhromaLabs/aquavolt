@@ -185,11 +185,11 @@ export const futuriseDev = {
         }
     },
 
-    async sendStkPush(phoneNumber, amount, passkey = null) {
+    async sendStkPush(phoneNumber, amount, unitId = null, tenantId = null, passkey = null) {
         console.log(`[Edge] Sending STK Push to ${phoneNumber} for KES ${amount}...`);
         try {
             const { data, error } = await supabase.functions.invoke('mpesa-stk-push', {
-                body: { phoneNumber, amount, passkey }
+                body: { phoneNumber, amount, unitId, tenantId, passkey }
             });
 
             if (error) throw error;

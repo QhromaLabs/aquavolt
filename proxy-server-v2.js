@@ -4,7 +4,7 @@ import fetch from 'node-fetch';
 import https from 'https';
 
 const app = express();
-const PORT = process.env.PORT || process.env.PROXY_PORT || 3001;
+const PORT = process.env.PORT || process.env.PROXY_PORT || 3002;
 
 // Futurise API base URL
 const FUTURISE_BASE_URL = 'https://47.90.150.122:4680';
@@ -153,8 +153,13 @@ app.get('/', (req, res) => {
     res.send('AquaVolt Proxy v2 (ESM) is Running 🚀');
 });
 
+
 const server = app.listen(PORT, '0.0.0.0', () => {
     const address = server.address();
+    if (!address) {
+        console.error('Failed to get server address');
+        return;
+    }
     console.log(`
 ╔════════════════════════════════════════╗
 ║   AquaVolt Proxy Server v2 (ESM)       ║
@@ -165,3 +170,14 @@ const server = app.listen(PORT, '0.0.0.0', () => {
 ╚════════════════════════════════════════╝
   `);
 });
+
+server.on('error', (error) => {
+    if (error.code === 'EADDRINUSE') {
+        console.error(`\n❌ Port ${PORT} is already in use!`);
+        console.error(`Try using a different port: PORT=3003 node proxy-server-v2.js\n`);
+    } else {
+        console.error('Server error:', error);
+    }
+    process.exit(1);
+});
+

@@ -4,7 +4,12 @@ import {
     SearchOutlined,
     CopyOutlined,
     CheckCircleOutlined,
-    ThunderboltOutlined
+    ThunderboltOutlined,
+    SyncOutlined,
+    CloseCircleOutlined,
+    ClockCircleOutlined,
+    StopOutlined,
+    ReloadOutlined
 } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
@@ -19,43 +24,133 @@ const { Search } = Input;
 const TenantHistory = () => {
     const navigate = useNavigate();
     const { user } = useAuth();
-    const [topups, setTopups] = useState([]);
+    const [transactions, setTransactions] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
     const [searchTerm, setSearchTerm] = useState('');
     const [statusFilter, setStatusFilter] = useState('all');
     const [selectedTopup, setSelectedTopup] = useState(null);
+    const [retrying, setRetrying] = useState({});
 
     useEffect(() => {
-        fetchTopups();
+        fetchTransactions();
     }, [user]);
 
-    const fetchTopups = async () => {
+    // Refetch transactions when page comes into focus (e.g., after buying a token)
+    useEffect(() => {
+        const handleFocus = () => {
+            fetchTransactions();
+        };
+
+        window.addEventListener('focus', handleFocus);
+        // Also refetch when component mounts or becomes visible
+        handleFocus();
+
+        return () => {
+            window.removeEventListener('focus', handleFocus);
+        };
+    }, [user]);
+
+    const fetchTransactions = async () => {
         if (!user) return;
 
         setLoading(true);
         try {
-            const { data, error: fetchError } = await supabase
+            // Fetch M-Pesa payments
+            const { data: mpesaData, error: mpesaError } = await supabase
+                .from('mpesa_payments')
+                .select(`
+                    id,
+                    checkout_request_id,
+                    phone_number,
+                    amount,
+                    status,
+                    mpesa_receipt_number,
+                    token_vended,
+                    topup_id,
+                    created_at,
+                    unit_id,
+                    units (
+                        label,
+                        meter_number
+                    )
+                `)
+                .eq('tenant_id', user.id)
+                .order('created_at', { ascending: false });
+
+            if (mpesaError) throw mpesaError;
+
+            // Fetch topups
+            const { data: topupsData, error: topupsError } = await supabase
                 .from('topups')
                 .select(`
                     id,
                     amount_paid,
                     amount_vended,
+                    units_kwh,
                     fee_amount,
                     payment_channel,
                     token,
                     futurise_status,
                     created_at,
+                    mpesa_receipt_number,
                     units (
                         label,
-                        meter_number
+                        meter_number,
+                        properties (
+                            name
+                        )
                     )
-               `)
+                `)
                 .eq('tenant_id', user.id)
                 .order('created_at', { ascending: false });
 
-            if (fetchError) throw fetchError;
-            setTopups(data || []);
+            if (topupsError) throw topupsError;
+
+            // Merge M-Pesa payments with topups
+            const mergedData = [];
+
+            // Add M-Pesa payments
+            (mpesaData || []).forEach(payment => {
+                const linkedTopup = (topupsData || []).find(t => t.id === payment.topup_id);
+                mergedData.push({
+                    id: payment.id,
+                    type: 'mpesa_payment',
+                    payment_id: payment.id,
+                    checkout_request_id: payment.checkout_request_id,
+                    amount: payment.amount,
+                    payment_status: payment.status,
+                    token_vended: payment.token_vended,
+                    mpesa_receipt_number: payment.mpesa_receipt_number,
+                    token: linkedTopup?.token,
+                    units: payment.units,
+                    created_at: payment.created_at,
+                    topup: linkedTopup,
+                    unit_id: payment.unit_id
+                });
+            });
+
+            // Add topups without M-Pesa payment records (legacy or other payment methods)
+            (topupsData || []).forEach(topup => {
+                const alreadyAdded = mergedData.some(m => m.topup?.id === topup.id);
+                if (!alreadyAdded) {
+                    mergedData.push({
+                        id: topup.id,
+                        type: 'topup',
+                        amount: topup.amount_paid,
+                        payment_status: topup.futurise_status,
+                        token: topup.token,
+                        units: topup.units,
+                        created_at: topup.created_at,
+                        topup: topup
+                    });
+                }
+            });
+
+            // Sort by created_at
+            mergedData.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+
+            setTransactions(mergedData);
         } catch (err) {
             console.error('Error fetching history:', err);
             setError(err.message);
@@ -64,17 +159,109 @@ const TenantHistory = () => {
         }
     };
 
-    const copyToken = (token) => {
-        navigator.clipboard.writeText(token);
-        message.success('Token copied to clipboard!');
+    const handleRetryVending = async (transaction) => {
+        setRetrying({ ...retrying, [transaction.id]: true });
+        try {
+            // Get unit meter number
+            const { data: unit } = await supabase
+                .from('units')
+                .select('meter_number')
+                .eq('id', transaction.unit_id)
+                .single();
+
+            if (!unit || !unit.meter_number) {
+                throw new Error('Meter number not found');
+            }
+
+            // Calculate net amount (assuming 5% service fee)
+            const serviceFee = transaction.amount * 0.05;
+            const netAmount = transaction.amount - serviceFee;
+
+            // Call vending function
+            message.loading({ content: 'Retrying token vending...', key: 'retry_vend', duration: 0 });
+
+            const { data, error } = await supabase.functions.invoke('futurise-vend-token', {
+                body: {
+                    action: 'vend',
+                    meterNumber: unit.meter_number,
+                    amount: netAmount
+                }
+            });
+
+            if (error) throw error;
+
+            if (data.success && data.token) {
+                // Create topup record
+                const { data: topup, error: topupError } = await supabase
+                    .from('topups')
+                    .insert({
+                        unit_id: transaction.unit_id,
+                        tenant_id: user.id,
+                        amount_paid: transaction.amount,
+                        amount_vended: netAmount,
+                        units_kwh: parseFloat(data.units || 0), // Store actual kWh units
+                        fee_amount: serviceFee,
+                        payment_channel: 'mpesa',
+                        token: data.token,
+                        futurise_status: 'success',
+                        futurise_message: 'Token generated via retry',
+                        futurise_transaction_id: data.transactionId,
+                        mpesa_receipt_number: transaction.mpesa_receipt_number
+                    })
+                    .select()
+                    .single();
+
+                if (topupError) throw topupError;
+
+                // Update M-Pesa payment record
+                await supabase
+                    .from('mpesa_payments')
+                    .update({
+                        token_vended: true,
+                        topup_id: topup.id
+                    })
+                    .eq('id', transaction.payment_id);
+
+                message.success({ content: 'Token vended successfully!', key: 'retry_vend' });
+                fetchTransactions(); // Refresh list
+            } else {
+                throw new Error(data.message || data.error || 'Vending failed');
+            }
+        } catch (err) {
+            console.error('Retry vending error:', err);
+            message.error({ content: `Retry failed: ${err.message}`, key: 'retry_vend' });
+        } finally {
+            setRetrying({ ...retrying, [transaction.id]: false });
+        }
     };
 
-    const filteredTopups = topups.filter(topup => {
-        const matchesSearch = searchTerm === '' ||
-            topup.token?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            topup.units?.meter_number?.includes(searchTerm);
+    const getStatusIcon = (status) => {
+        switch (status) {
+            case 'success': return <CheckCircleOutlined />;
+            case 'pending': return <ClockCircleOutlined spin />;
+            case 'failed': return <CloseCircleOutlined />;
+            case 'cancelled': return <StopOutlined />;
+            default: return <CheckCircleOutlined />;
+        }
+    };
 
-        const matchesStatus = statusFilter === 'all' || topup.futurise_status === statusFilter;
+    const getStatusColor = (status) => {
+        switch (status) {
+            case 'success': return 'success';
+            case 'pending': return 'processing';
+            case 'failed': return 'error';
+            case 'cancelled': return 'default';
+            default: return 'default';
+        }
+    };
+
+    const filteredTransactions = transactions.filter(tx => {
+        const matchesSearch = searchTerm === '' ||
+            tx.token?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            tx.units?.meter_number?.includes(searchTerm) ||
+            tx.mpesa_receipt_number?.includes(searchTerm);
+
+        const matchesStatus = statusFilter === 'all' || tx.payment_status === statusFilter;
 
         return matchesSearch && matchesStatus;
     });
@@ -101,7 +288,7 @@ const TenantHistory = () => {
                         Purchase History
                     </Title>
                     <Text type="secondary" style={{ fontSize: '14px' }}>
-                        All your electricity token purchases
+                        All your electricity token purchases and M-Pesa payments
                     </Text>
                 </div>
 
@@ -109,7 +296,7 @@ const TenantHistory = () => {
                 <MobileCard style={{ marginBottom: 16 }}>
                     <Space direction="vertical" style={{ width: '100%' }} size="middle">
                         <Search
-                            placeholder="Search by token or meter number"
+                            placeholder="Search by token, meter, or receipt number"
                             prefix={<SearchOutlined />}
                             value={searchTerm}
                             onChange={(e) => setSearchTerm(e.target.value)}
@@ -127,6 +314,7 @@ const TenantHistory = () => {
                             <Select.Option value="success">Successful</Select.Option>
                             <Select.Option value="pending">Pending</Select.Option>
                             <Select.Option value="failed">Failed</Select.Option>
+                            <Select.Option value="cancelled">Cancelled</Select.Option>
                         </Select>
                     </Space>
                 </MobileCard>
@@ -142,7 +330,7 @@ const TenantHistory = () => {
                     />
                 )}
 
-                {filteredTopups.length === 0 ? (
+                {filteredTransactions.length === 0 ? (
                     <MobileCard>
                         <Empty
                             description={searchTerm || statusFilter !== 'all' ? 'No transactions found' : 'No purchase history'}
@@ -169,16 +357,12 @@ const TenantHistory = () => {
                     </MobileCard>
                 ) : (
                     <List
-                        dataSource={filteredTopups}
-                        renderItem={(topup) => (
+                        dataSource={filteredTransactions}
+                        renderItem={(tx) => (
                             <MobileCard
-                                key={topup.id}
-                                onClick={() => setSelectedTopup(topup)}
+                                key={tx.id}
                                 style={{ marginBottom: 12, cursor: 'pointer', transition: 'transform 0.1s' }}
                                 bodyStyle={{ padding: '16px' }}
-                                onMouseDown={(e) => e.currentTarget.style.transform = 'scale(0.98)'}
-                                onMouseUp={(e) => e.currentTarget.style.transform = 'scale(1)'}
-                                onMouseLeave={(e) => e.currentTarget.style.transform = 'scale(1)'}
                             >
                                 <div style={{
                                     display: 'flex',
@@ -188,10 +372,10 @@ const TenantHistory = () => {
                                 }}>
                                     <div>
                                         <Text strong style={{ fontSize: '18px', color: '#1ecf49', display: 'block' }}>
-                                            KES {parseFloat(topup.amount_paid).toFixed(2)}
+                                            KES {parseFloat(tx.amount).toFixed(2)}
                                         </Text>
                                         <Text type="secondary" style={{ fontSize: '12px' }}>
-                                            {new Date(topup.created_at).toLocaleDateString('en-US', {
+                                            {new Date(tx.created_at).toLocaleDateString('en-US', {
                                                 year: 'numeric',
                                                 month: 'short',
                                                 day: 'numeric',
@@ -200,44 +384,60 @@ const TenantHistory = () => {
                                             })}
                                         </Text>
                                     </div>
-                                    <Tag color={topup.futurise_status === 'success' ? 'success' : 'default'}>
-                                        {topup.futurise_status || 'Completed'}
+                                    <Tag
+                                        icon={getStatusIcon(tx.payment_status)}
+                                        color={getStatusColor(tx.payment_status)}
+                                    >
+                                        {tx.payment_status || 'Completed'}
                                     </Tag>
                                 </div>
 
                                 <div style={{ marginBottom: 12 }}>
                                     <Space direction="vertical" size="small" style={{ width: '100%' }}>
-                                        <div>
-                                            <Text type="secondary" style={{ fontSize: '12px' }}>Unit: </Text>
-                                            <Text style={{ fontSize: '13px' }}>{topup.units?.label || 'N/A'}</Text>
-                                        </div>
-                                        <div>
-                                            <Text type="secondary" style={{ fontSize: '12px' }}>Meter: </Text>
-                                            <Text style={{ fontSizesize: '13px', fontFamily: 'monospace' }}>
-                                                {topup.units?.meter_number || 'N/A'}
-                                            </Text>
-                                        </div>
-                                        <div>
-                                            <Text type="secondary" style={{ fontSize: '12px' }}>Units: </Text>
-                                            <Text style={{ fontSize: '13px' }}>
-                                                <ThunderboltOutlined style={{ color: '#1ecf49' }} />
-                                                {' '}KES {parseFloat(topup.amount_vended).toFixed(2)}
-                                            </Text>
-                                        </div>
+                                        {tx.units && (
+                                            <>
+                                                <div>
+                                                    <Text type="secondary" style={{ fontSize: '12px' }}>Unit: </Text>
+                                                    <Text style={{ fontSize: '13px' }}>{tx.units.label || 'N/A'}</Text>
+                                                </div>
+                                                <div>
+                                                    <Text type="secondary" style={{ fontSize: '12px' }}>Meter: </Text>
+                                                    <Text style={{ fontSize: '13px', fontFamily: 'monospace' }}>
+                                                        {tx.units.meter_number || 'N/A'}
+                                                    </Text>
+                                                </div>
+                                            </>
+                                        )}
+                                        {tx.mpesa_receipt_number && (
+                                            <div>
+                                                <Text type="secondary" style={{ fontSize: '12px' }}>M-Pesa Receipt: </Text>
+                                                <Text style={{ fontSize: '13px', fontFamily: 'monospace' }}>
+                                                    {tx.mpesa_receipt_number}
+                                                </Text>
+                                            </div>
+                                        )}
+                                        {tx.topup && (
+                                            <div>
+                                                <Text type="secondary" style={{ fontSize: '12px' }}>Units Vended: </Text>
+                                                <Text style={{ fontSize: '13px' }}>
+                                                    <ThunderboltOutlined style={{ color: '#1ecf49' }} />
+                                                    {' '}KES {parseFloat(tx.topup.amount_vended).toFixed(2)}
+                                                </Text>
+                                            </div>
+                                        )}
                                     </Space>
                                 </div>
 
-                                {topup.token && (
+                                {/* Token Display */}
+                                {tx.token && (
                                     <div style={{
                                         background: '#f9f9f9',
                                         padding: '10px',
                                         borderRadius: '6px',
                                         border: '1px dashed #d9d9d9',
-                                        display: 'flex',
-                                        justifyContent: 'space-between',
-                                        alignItems: 'center'
+                                        marginBottom: 8
                                     }}>
-                                        <div style={{ flex: 1, marginRight: 8 }}>
+                                        <div>
                                             <Text type="secondary" style={{ fontSize: '11px', display: 'block' }}>
                                                 Token
                                             </Text>
@@ -248,11 +448,34 @@ const TenantHistory = () => {
                                                     fontFamily: 'monospace',
                                                     wordBreak: 'break-all'
                                                 }}
+                                                onClick={() => setSelectedTopup(tx.topup)}
                                             >
-                                                {topup.token}
+                                                {tx.token}
                                             </Text>
                                         </div>
                                     </div>
+                                )}
+
+                                {/* Vending Status & Retry Button */}
+                                {tx.type === 'mpesa_payment' && tx.payment_status === 'success' && !tx.token_vended && (
+                                    <Alert
+                                        message="Token Not Vended"
+                                        description="Payment was successful but token vending failed. Click retry to attempt vending again."
+                                        type="warning"
+                                        showIcon
+                                        style={{ marginTop: 12 }}
+                                        action={
+                                            <Button
+                                                size="small"
+                                                type="primary"
+                                                icon={<ReloadOutlined />}
+                                                loading={retrying[tx.id]}
+                                                onClick={() => handleRetryVending(tx)}
+                                            >
+                                                Retry
+                                            </Button>
+                                        }
+                                    />
                                 )}
                             </MobileCard>
                         )}
@@ -260,7 +483,7 @@ const TenantHistory = () => {
                 )}
 
                 {/* Summary */}
-                {filteredTopups.length > 0 && (
+                {filteredTransactions.length > 0 && (
                     <div style={{
                         textAlign: 'center',
                         padding: '20px 0',
@@ -269,7 +492,7 @@ const TenantHistory = () => {
                     }}>
                         <Text type="secondary" style={{ fontSize: '13px' }}>
                             <CheckCircleOutlined style={{ color: '#1ecf49', marginRight: 4 }} />
-                            Showing {filteredTopups.length} of {topups.length} transactions
+                            Showing {filteredTransactions.length} of {transactions.length} transactions
                         </Text>
                     </div>
                 )}

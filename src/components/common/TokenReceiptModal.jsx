@@ -276,7 +276,7 @@ const TokenReceiptModal = ({ visible, onClose, topup, tenantName }) => {
                         </div>
                         <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                             <Text type="secondary">Units (kWh)</Text>
-                            <Text strong>{topup.kwh ? `${topup.kwh} kWh` : 'N/A'}</Text>
+                            <Text strong>{topup.units_kwh ? `${topup.units_kwh} kWh` : topup.kwh ? `${topup.kwh} kWh` : 'N/A'}</Text>
                         </div>
                         <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                             <Text type="secondary">Meter No.</Text>
