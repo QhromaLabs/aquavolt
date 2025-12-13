@@ -129,6 +129,7 @@ serve(async (req) => {
                         })
 
                         const vendData = await vendRes.json()
+                        console.log('Vend Data Received:', JSON.stringify(vendData));
 
                         if (vendData.success && vendData.token) {
                             console.log('Token vended successfully:', vendData.token)
@@ -141,6 +142,7 @@ serve(async (req) => {
                                     tenant_id: updatedPayment.tenant_id,
                                     amount_paid: updatedPayment.amount,
                                     amount_vended: vendData.units || netAmount,
+                                    units_kwh: vendData.units,
                                     fee_amount: fee,
                                     payment_channel: 'mpesa',
                                     token: vendData.token,

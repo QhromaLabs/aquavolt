@@ -51,6 +51,7 @@ const BuyToken = () => {
     const [phoneNumber, setPhoneNumber] = useState('');
     const [paymentStatus, setPaymentStatus] = useState('idle'); // idle, pushing, waiting, vended, error
     const [serviceFeePercent, setServiceFeePercent] = useState(5); // Default 5%
+    const [tariffKshPerKwh, setTariffKshPerKwh] = useState(null);
 
     const quickAmounts = [100, 200, 500, 1000, 2000, 5000];
 
@@ -84,17 +85,31 @@ const BuyToken = () => {
     }, []);
 
     useEffect(() => {
-        const fetchServiceFee = async () => {
-            const { data } = await supabase
-                .from('admin_settings')
-                .select('value')
-                .eq('key', 'service_fee_percent')
-                .single();
-            if (data?.value) {
-                setServiceFeePercent(parseFloat(data.value));
+        const fetchSettings = async () => {
+            try {
+                const { data, error } = await supabase
+                    .from('admin_settings')
+                    .select('key, value')
+                    .in('key', ['service_fee_percent', 'tariff_ksh_per_kwh']);
+
+                if (error) throw error;
+
+                const settings = {};
+                data?.forEach(item => {
+                    settings[item.key] = item.value;
+                });
+
+                if (settings.service_fee_percent) {
+                    setServiceFeePercent(parseFloat(settings.service_fee_percent));
+                }
+                if (settings.tariff_ksh_per_kwh) {
+                    setTariffKshPerKwh(parseFloat(settings.tariff_ksh_per_kwh));
+                }
+            } catch (err) {
+                console.error('Error fetching settings:', err);
             }
         };
-        fetchServiceFee();
+        fetchSettings();
     }, []);
 
     // Handle pre-selected unit from navigation state
@@ -253,7 +268,21 @@ const BuyToken = () => {
         }
     };
 
-    const getAmount = () => selectedAmount || customAmount || 0;
+    const getAmount = () => selectedAmount || customAmount || 0; // Gross amount
+
+    const getNetAmount = () => {
+        const amount = getAmount();
+        if (!amount) return 0;
+        return amount * (1 - serviceFeePercent / 100);
+    };
+
+    const getEstimatedKwh = () => {
+        const netAmount = getNetAmount();
+        if (!netAmount || !tariffKshPerKwh || tariffKshPerKwh <= 0) return 0;
+        return netAmount / tariffKshPerKwh;
+    };
+
+    const hasTariffRate = tariffKshPerKwh && tariffKshPerKwh > 0;
 
     return (
         <TenantLayout>
@@ -391,12 +420,21 @@ const BuyToken = () => {
                                         - KES {(getAmount() * (serviceFeePercent / 100)).toFixed(2)}
                                     </Text>
                                 </div>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
+                                    <Text type="secondary">Net to Vend</Text>
+                                    <Text strong style={{ color: '#1f1f1f' }}>KES {getNetAmount().toFixed(2)}</Text>
+                                </div>
                                 <Divider style={{ margin: '8px 0', borderColor: '#e8e8e8' }} />
                                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                    <Text strong style={{ fontSize: '15px' }}>Total Units</Text>
+                                    <div>
+                                        <Text strong style={{ fontSize: '15px', display: 'block' }}>Est. Units (kWh)</Text>
+                                        <Text type="secondary" style={{ fontSize: '12px' }}>
+                                            {hasTariffRate ? `${tariffKshPerKwh} KES / kWh` : 'Set tariff in admin settings'}
+                                        </Text>
+                                    </div>
                                     <div style={{ textAlign: 'right' }}>
                                         <Text strong style={{ fontSize: '20px', color: '#1ecf49', display: 'block' }}>
-                                            KES {(getAmount() * (1 - serviceFeePercent / 100)).toFixed(2)}
+                                            {hasTariffRate ? `${getEstimatedKwh().toFixed(2)} kWh` : '--'}
                                         </Text>
                                     </div>
                                 </div>
@@ -546,6 +584,32 @@ const BuyToken = () => {
                             >
                                 Copy
                             </Button>
+                        </div>
+                    )}
+
+                    {tokenResult?.amount_vended && (
+                        <div style={{
+                            background: '#fff',
+                            padding: '16px',
+                            borderRadius: '12px',
+                            border: '1px solid #f0f0f0',
+                            marginBottom: 16,
+                            textAlign: 'left'
+                        }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
+                                <Text type="secondary">Units (kWh)</Text>
+                                <Text strong>{parseFloat(tokenResult.amount_vended).toFixed(2)} kWh</Text>
+                            </div>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
+                                <Text type="secondary">Meter</Text>
+                                <Text strong style={{ fontFamily: 'monospace' }}>{tokenResult.meter_number}</Text>
+                            </div>
+                            {tokenResult.mpesa_receipt && (
+                                <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 4 }}>
+                                    <Text type="secondary">M-Pesa Receipt</Text>
+                                    <Text strong style={{ fontFamily: 'monospace' }}>{tokenResult.mpesa_receipt}</Text>
+                                </div>
+                            )}
                         </div>
                     )}
 

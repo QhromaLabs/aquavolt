@@ -161,7 +161,32 @@ serve(async (req) => {
         // Response Handling
         if (action === 'vend') {
             if (apiData.code !== 200) throw new Error(apiData.msg || 'Vending failed');
+
             const d = apiData.data;
+            if (!d) {
+                console.error('Vendor response missing data object:', JSON.stringify(apiData));
+                throw new Error('Vendor returned success but no data');
+            }
+
+            console.log('Vend Response Data:', JSON.stringify(d));
+
+            // Try different fields for units/value
+            // Some APIs return 'value', 'units', 'qnty', etc.
+            let rawUnits = d.value !== undefined ? d.value : (d.units || d.qnty || d.quantity || 0);
+
+            // Clean up units if it is a string (e.g. "9.3 Kwh")
+            let fetchedUnits = 0;
+            if (typeof rawUnits === 'string') {
+                const match = rawUnits.match(/[\d\.]+/);
+                if (match) {
+                    fetchedUnits = parseFloat(match[0]);
+                }
+            } else {
+                fetchedUnits = parseFloat(rawUnits) || 0;
+            }
+
+            console.log(`Parsed Units: ${rawUnits} -> ${fetchedUnits}`);
+
             responseData = {
                 success: true,
                 token: d.form,
@@ -169,7 +194,7 @@ serve(async (req) => {
                 requestId: apiData.requestId,
                 meterNumber: d.meterNo,
                 amount: params.amount,
-                units: d.value,
+                units: fetchedUnits,
                 clearTime: d.clearTime,
             };
         } else if (action === 'check_meter') {

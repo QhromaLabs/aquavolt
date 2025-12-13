@@ -42,6 +42,7 @@ const Settings = () => {
 
     // System Settings Form
     const [systemForm] = Form.useForm();
+    const tariffKshPerKwh = Form.useWatch('tariff_ksh_per_kwh', systemForm);
     const [settingsLoading, setSettingsLoading] = useState(false);
 
     useEffect(() => {
@@ -53,7 +54,7 @@ const Settings = () => {
             const { data, error } = await supabase
                 .from('admin_settings')
                 .select('*')
-                .in('key', ['service_fee_percent', 'support_phone_whatsapp']);
+                .in('key', ['service_fee_percent', 'support_phone_whatsapp', 'tariff_ksh_per_kwh']);
 
             if (data) {
                 const settings = {};
@@ -62,7 +63,8 @@ const Settings = () => {
                 });
                 systemForm.setFieldsValue({
                     service_fee_percent: settings.service_fee_percent,
-                    support_phone_whatsapp: settings.support_phone_whatsapp
+                    support_phone_whatsapp: settings.support_phone_whatsapp,
+                    tariff_ksh_per_kwh: settings.tariff_ksh_per_kwh
                 });
             }
         } catch (err) {
@@ -75,7 +77,8 @@ const Settings = () => {
         try {
             const updates = [
                 { key: 'service_fee_percent', value: values.service_fee_percent.toString() },
-                { key: 'support_phone_whatsapp', value: values.support_phone_whatsapp?.toString() || '' }
+                { key: 'support_phone_whatsapp', value: values.support_phone_whatsapp?.toString() || '' },
+                { key: 'tariff_ksh_per_kwh', value: values.tariff_ksh_per_kwh?.toString() || '' }
             ];
 
             const { error } = await supabase
@@ -319,6 +322,22 @@ const Settings = () => {
                                         precision={1}
                                         step={0.1}
                                         addonAfter="%"
+                                        style={{ width: '100%' }}
+                                    />
+                                </Form.Item>
+
+                                <Form.Item
+                                    name="tariff_ksh_per_kwh"
+                                    label="Tariff (KES per kWh)"
+                                    extra={`Cost per kWh. Tenants will see estimated units. ${tariffKshPerKwh ? `≈ ${(1 / tariffKshPerKwh).toFixed(4)} kWh per KES` : ''}`}
+                                    rules={[{ required: true, message: 'Please set the tariff rate' }]}
+                                >
+                                    <InputNumber
+                                        min={0.0001}
+                                        precision={4}
+                                        step={0.0001}
+                                        addonBefore="KES"
+                                        addonAfter="/ kWh"
                                         style={{ width: '100%' }}
                                     />
                                 </Form.Item>

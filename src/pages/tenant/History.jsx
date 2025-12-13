@@ -421,7 +421,7 @@ const TenantHistory = () => {
                                                 <Text type="secondary" style={{ fontSize: '12px' }}>Units Vended: </Text>
                                                 <Text style={{ fontSize: '13px' }}>
                                                     <ThunderboltOutlined style={{ color: '#1ecf49' }} />
-                                                    {' '}KES {parseFloat(tx.topup.amount_vended).toFixed(2)}
+                                                    {' '}{tx.topup.units_kwh ? `${parseFloat(tx.topup.units_kwh || 0).toFixed(2)} kWh` : `KES ${parseFloat(tx.topup.amount_vended || 0).toFixed(2)}`}
                                                 </Text>
                                             </div>
                                         )}
