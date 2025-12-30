@@ -8,11 +8,13 @@ import 'top_toast.dart';
 class ConfirmEmailModal extends StatefulWidget {
   final String email;
   final String password;
+  final VoidCallback? onVerified;
 
   const ConfirmEmailModal({
     super.key, 
     required this.email,
     required this.password,
+    this.onVerified,
   });
 
   @override
@@ -38,7 +40,11 @@ class _ConfirmEmailModalState extends State<ConfirmEmailModal> {
       if (mounted) {
         if (authProvider.user != null) {
            // Success!
-           context.pushReplacement('/connect-meter');
+           if (widget.onVerified != null) {
+             widget.onVerified!();
+           } else {
+             context.pushReplacement('/connect-meter');
+           }
         } else {
            // Should ideally be caught by catch block if signIn throws on failure
            showTopToast(context, 'Verification incomplete. Please check your email.', type: ToastType.error);

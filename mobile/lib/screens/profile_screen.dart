@@ -6,6 +6,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../providers/auth_provider.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 import '../widgets/top_toast.dart';
+import 'security_settings_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -275,6 +276,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             icon: PhosphorIconsRegular.lock,
                             title: 'Change Password',
                             onTap: _resetPassword,
+                          ),
+                          const Divider(height: 1),
+                          _ProfileItem( // New item
+                            icon: PhosphorIconsRegular.shieldCheck,
+                            title: 'Security',
+                            onTap: () => Navigator.of(context).push(
+                              MaterialPageRoute(builder: (ctx) => const SecuritySettingsScreen()),
+                            ),
                           ),
                           const Divider(height: 1),
                           _ProfileItem(

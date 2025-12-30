@@ -405,27 +405,6 @@ class _BuyTokenScreenState extends State<BuyTokenScreen> {
                                    Text('KES ${_amount!.toStringAsFixed(2)}', style: const TextStyle(fontWeight: FontWeight.bold)),
                                  ],
                                ),
-                               const SizedBox(height: 8),
-                               // Service Fee
-                               Row(
-                                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                 children: [
-                                   Text('Service Fee (${_serviceFeePercent.toStringAsFixed(1)}%)', style: TextStyle(color: Colors.grey.shade600)),
-                                   Text(
-                                     '- KES ${_feeAmount.toStringAsFixed(2)}', 
-                                     style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.red),
-                                   ),
-                                 ],
-                               ),
-                               const SizedBox(height: 8),
-                               // Net to Vend
-                               Row(
-                                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                 children: [
-                                   Text('Net to Vend', style: TextStyle(color: Colors.grey.shade600)),
-                                   Text('KES ${_netAmount.toStringAsFixed(2)}', style: const TextStyle(fontWeight: FontWeight.bold)),
-                                 ],
-                               ),
                                const Divider(height: 24),
                                // Est Units
                                Row(

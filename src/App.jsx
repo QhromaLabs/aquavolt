@@ -6,6 +6,7 @@ import Login from './pages/auth/Login';
 import TenantLogin from './pages/auth/TenantLogin';
 import SignUp from './pages/auth/SignUp';
 import Unauthorized from './pages/auth/Unauthorized';
+import LandingPage1 from './pages/public/LandingPage1';
 
 // Admin pages
 import AdminDashboard from './pages/admin/Dashboard';
@@ -16,8 +17,11 @@ import TopupsLog from './pages/admin/TopupsLog';
 import MaintenanceConsole from './pages/admin/MaintenanceConsole';
 import CommissionEngine from './pages/admin/CommissionEngine';
 import AdminFinance from './pages/admin/Finance';
+import WithdrawalRequests from './pages/admin/WithdrawalRequests';
 import Settings from './pages/admin/Settings';
 import FuturiseSync from './pages/admin/FuturiseSync';
+import AppUpdate from './pages/admin/AppUpdate';
+
 
 // Landlord pages
 import LandlordDashboard from './pages/landlord/Dashboard';
@@ -51,6 +55,7 @@ function App() {
                     <Route path="/login" element={<Login />} />
                     <Route path="/portal" element={<TenantLogin />} />
                     <Route path="/signup" element={<SignUp />} />
+                    <Route path="/landing-page-1" element={<LandingPage1 />} />
 
                     {/* Tenant Setup Route (potentially public or with minimal guard) */}
                     <Route path="/tenant/setup" element={
@@ -75,7 +80,10 @@ function App() {
                                     <Route path="maintenance" element={<MaintenanceConsole />} />
                                     <Route path="commissions" element={<CommissionEngine />} />
                                     <Route path="finance" element={<AdminFinance />} />
+                                    <Route path="withdrawals" element={<WithdrawalRequests />} />
                                     <Route path="futurise-sync" element={<FuturiseSync />} />
+                                    <Route path="app-update" element={<AppUpdate />} />
+
                                     <Route path="settings" element={<Settings />} />
                                     <Route path="*" element={<Navigate to="/admin/dashboard" replace />} />
                                 </Routes>
@@ -145,9 +153,10 @@ function App() {
                         }
                     />
 
-                    {/* Default redirect */}
-                    <Route path="/" element={<RoleBasedRedirect />} />
-                    <Route path="*" element={<Navigate to="/login" replace />} />
+                    {/* Default home route - Landing Page */}
+                    <Route path="/" element={<LandingPage1 />} />
+                    <Route path="/dashboard" element={<RoleBasedRedirect />} />
+                    <Route path="*" element={<Navigate to="/" replace />} />
                 </Routes>
             </AuthProvider>
         </BrowserRouter>

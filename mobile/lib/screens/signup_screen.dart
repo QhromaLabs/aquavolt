@@ -47,12 +47,13 @@ class _SignUpScreenState extends State<SignUpScreen> {
       
       if (mounted) {
         // Show the Confirm Email Modal
-        showDialog(
+        await showDialog(
           context: context,
           barrierDismissible: false,
           builder: (context) => ConfirmEmailModal(
             email: _emailController.text.trim(),
             password: _passwordController.text.trim(),
+            onVerified: () => context.go('/security-intro'),
           ),
         );
       }

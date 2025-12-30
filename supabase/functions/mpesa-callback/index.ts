@@ -102,16 +102,26 @@ serve(async (req) => {
                     .single()
 
                 if (unit && unit.meter_number) {
-                    // Calculate service fee (get from settings)
-                    const { data: settings } = await supabaseClient
+                    // Fetch settings (service fee and tariff)
+                    const { data: settingsData } = await supabaseClient
                         .from('admin_settings')
-                        .select('value')
-                        .eq('key', 'service_fee_percent')
-                        .single()
+                        .select('key, value')
+                        .in('key', ['service_fee_percent', 'tariff_ksh_per_kwh'])
 
-                    const serviceFeePercent = settings?.value ? parseFloat(settings.value) : 5
+                    const settings: Record<string, string> = {}
+                    settingsData?.forEach((s: any) => settings[s.key] = s.value)
+
+                    const serviceFeePercent = settings.service_fee_percent ? parseFloat(settings.service_fee_percent) : 5
+                    const tariff = settings.tariff_ksh_per_kwh ? parseFloat(settings.tariff_ksh_per_kwh) : 28 // Default safely
+
                     const fee = updatedPayment.amount * (serviceFeePercent / 100)
                     const netAmount = updatedPayment.amount - fee
+
+                    // Calculate estimated units to vend
+                    // Futurise "money" field expects units when configured this way
+                    const estimatedUnits = netAmount / tariff
+
+                    console.log(`Vending Analysis: Amount=${updatedPayment.amount}, Net=${netAmount}, Tariff=${tariff}, Units=${estimatedUnits}`)
 
                     // Call vending function
                     try {
@@ -124,7 +134,7 @@ serve(async (req) => {
                             body: JSON.stringify({
                                 action: 'vend',
                                 meterNumber: unit.meter_number,
-                                amount: netAmount
+                                amount: estimatedUnits // Sending UNITS now, not KES
                             })
                         })
 
@@ -134,6 +144,10 @@ serve(async (req) => {
                         if (vendData.success && vendData.token) {
                             console.log('Token vended successfully:', vendData.token)
 
+                            // Determine final units to save
+                            // If API returns units, use them, otherwise fallback to what we calculated
+                            const finalUnits = vendData.units || estimatedUnits
+
                             // Save to topups
                             const { data: topup } = await supabaseClient
                                 .from('topups')
@@ -141,8 +155,8 @@ serve(async (req) => {
                                     unit_id: updatedPayment.unit_id,
                                     tenant_id: updatedPayment.tenant_id,
                                     amount_paid: updatedPayment.amount,
-                                    amount_vended: vendData.units || netAmount,
-                                    units_kwh: vendData.units,
+                                    amount_vended: finalUnits, // Saving UNITS here as requested
+                                    units_kwh: finalUnits,
                                     fee_amount: fee,
                                     payment_channel: 'mpesa',
                                     token: vendData.token,
@@ -164,6 +178,119 @@ serve(async (req) => {
                                 .eq('id', updatedPayment.id)
 
                             console.log('Auto-vending completed, topup created:', topup.id)
+
+                            // --- SEND SMS NOTIFICATION (AFRICA'S TALKING) ---
+                            try {
+                                console.log('Attempting to send SMS...')
+                                // 1. Get SMS Credentials and Template
+                                const { data: smsCreds } = await supabaseClient
+                                    .from('api_credentials')
+                                    .select('credentials')
+                                    .eq('service_name', 'africastalking')
+                                    .single()
+
+                                if (smsCreds && smsCreds.credentials) {
+                                    const { username, api_key, sms_template, sender_id } = smsCreds.credentials
+
+                                    if (username && api_key) {
+                                        // 2. Prepare Message
+                                        let message = sms_template || 'Token: {token}. Units: {units} KWh. Amount: KES {amount}. Meter: {meter}.'
+                                        message = message.replace('{token}', vendData.token)
+                                            .replace('{units}', parseFloat(finalUnits).toFixed(2))
+                                            .replace('{amount}', updatedPayment.amount)
+                                            .replace('{meter}', unit.meter_number)
+                                            .replace('{name}', 'Customer') // You could fetch profile name if needed
+
+                                        // 3. Send SMS via Africa's Talking API
+                                        const atUrl = username === 'sandbox'
+                                            ? 'https://api.sandbox.africastalking.com/version1/messaging'
+                                            : 'https://api.africastalking.com/version1/messaging'
+
+                                        // Format phone number - AT requires + prefix
+                                        let smsPhone = updatedPayment.phone_number
+                                        if (!smsPhone.startsWith('+')) {
+                                            smsPhone = '+' + smsPhone
+                                        }
+
+                                        const formBody = new URLSearchParams()
+                                        formBody.append('username', username)
+                                        formBody.append('to', smsPhone) // Use formatted phone with +
+                                        formBody.append('message', message)
+                                        if (sender_id) formBody.append('from', sender_id)
+
+                                        const smsRes = await fetch(atUrl, {
+                                            method: 'POST',
+                                            headers: {
+                                                'apiKey': api_key,
+                                                'Content-Type': 'application/x-www-form-urlencoded',
+                                                'Accept': 'application/json'
+                                            },
+                                            body: formBody
+                                        })
+
+                                        const smsData = await smsRes.json()
+                                        console.log('SMS Send Result:', JSON.stringify(smsData))
+
+                                        // Log SMS attempt to database
+                                        const smsStatus = smsRes.ok && smsData.SMSMessageData ? 'success' : 'failed'
+                                        const errorMsg = smsStatus === 'failed' ? (smsData.message || JSON.stringify(smsData)) : null
+
+                                        await supabaseClient.from('sms_logs').insert({
+                                            tenant_id: updatedPayment.tenant_id,
+                                            phone_number: smsPhone,
+                                            message: message,
+                                            status: smsStatus,
+                                            provider: 'africastalking',
+                                            response_data: smsData,
+                                            error_message: errorMsg,
+                                            topup_id: topup.id
+                                        })
+                                    } else {
+                                        console.log('SMS skipped: Missing username or api_key in settings')
+                                        // Log skipped SMS
+                                        await supabaseClient.from('sms_logs').insert({
+                                            tenant_id: updatedPayment.tenant_id,
+                                            phone_number: updatedPayment.phone_number || 'unknown',
+                                            message: 'SMS skipped',
+                                            status: 'skipped',
+                                            provider: 'africastalking',
+                                            error_message: 'Missing username or api_key in settings',
+                                            topup_id: topup.id
+                                        })
+                                    }
+                                } else {
+                                    console.log('SMS skipped: No SMS configuration found in api_credentials')
+                                    // Log skipped SMS
+                                    await supabaseClient.from('sms_logs').insert({
+                                        tenant_id: updatedPayment.tenant_id,
+                                        phone_number: updatedPayment.phone_number || 'unknown',
+                                        message: 'SMS skipped',
+                                        status: 'skipped',
+                                        provider: 'africastalking',
+                                        error_message: 'No SMS configuration found in api_credentials',
+                                        topup_id: topup.id
+                                    })
+                                }
+                            } catch (smsError) {
+                                console.error('Failed to send SMS:', smsError)
+                                // Log failed SMS
+                                try {
+                                    await supabaseClient.from('sms_logs').insert({
+                                        tenant_id: updatedPayment.tenant_id,
+                                        phone_number: updatedPayment.phone_number || 'unknown',
+                                        message: 'SMS failed',
+                                        status: 'failed',
+                                        provider: 'africastalking',
+                                        error_message: smsError.message || String(smsError),
+                                        topup_id: topup ? topup.id : null
+                                    })
+                                } catch (logError) {
+                                    console.error('Failed to log SMS error:', logError)
+                                }
+                                // Do not throw, allow the process to finish successfully otherwise
+                            }
+                            // ------------------------------------------------
+
                         } else {
                             console.error('Vending failed:', vendData.message || vendData.error)
                         }

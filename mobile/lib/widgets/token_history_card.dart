@@ -24,7 +24,8 @@ class TokenHistoryCard extends StatelessWidget {
     final isPending = token == 'Pending';
     
     // Get units to show confirmation
-    final units = tokenData['units_kwh'] ?? tokenData['units']?['units_kwh'] ?? 0;
+    // User requested to use amount_vended as it is the column that is populated
+    final units = tokenData['units_kwh'] ?? tokenData['amount_vended'] ?? tokenData['units']?['units_kwh'] ?? 0;
 
     return GestureDetector(
       onTap: () {

@@ -18,7 +18,8 @@ import {
     HistoryOutlined,
     PlusOutlined,
     SearchOutlined,
-    ReloadOutlined
+    ReloadOutlined,
+    SendOutlined
 } from '@ant-design/icons';
 import MainLayout from '../../components/Layout/MainLayout';
 import { supabase } from '../../lib/supabase';
@@ -32,6 +33,7 @@ const TopupsLog = () => {
     const [modalVisible, setModalVisible] = useState(false);
     const [form] = Form.useForm();
     const [processing, setProcessing] = useState(false);
+    const [resending, setResending] = useState({});
 
     // Manual Topup Data
     const [units, setUnits] = useState([]);
@@ -133,6 +135,34 @@ const TopupsLog = () => {
         }
     };
 
+    const handleResendSMS = async (topup) => {
+        setResending(prev => ({ ...prev, [topup.id]: true }));
+        try {
+            const { data: { session } } = await supabase.auth.getSession();
+            const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/resend-sms`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${session?.access_token}`
+                },
+                body: JSON.stringify({ topup_id: topup.id })
+            });
+
+            const result = await res.json();
+
+            if (result.success) {
+                message.success('SMS sent successfully!');
+            } else {
+                message.error(`Failed to send SMS: ${result.message}`);
+            }
+        } catch (error) {
+            console.error('Resend SMS error:', error);
+            message.error('Failed to send SMS: ' + error.message);
+        } finally {
+            setResending(prev => ({ ...prev, [topup.id]: false }));
+        }
+    };
+
     const columns = [
         {
             title: 'Date',
@@ -172,6 +202,21 @@ const TopupsLog = () => {
             dataIndex: 'payment_channel',
             key: 'channel',
             render: (c) => <Tag>{c}</Tag>
+        },
+        {
+            title: 'Actions',
+            key: 'actions',
+            render: (_, record) => record.token ? (
+                <Button
+                    type="link"
+                    icon={<SendOutlined />}
+                    size="small"
+                    loading={resending[record.id]}
+                    onClick={() => handleResendSMS(record)}
+                >
+                    Resend SMS
+                </Button>
+            ) : null
         }
     ];
 

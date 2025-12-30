@@ -1,0 +1,380 @@
+﻿Running Gradle task 'assembleRelease'...                        
+Font asset "CupertinoIcons.ttf" was tree-shaken, reducing it from 257628 to 848 bytes (99.7% reduction). Tree-shaking can be disabled by providing the --no-tree-shake-icons flag when building your app.
+Font asset "Phosphor-Bold.ttf" was tree-shaken, reducing it from 495308 to 4996 bytes (99.0% reduction). Tree-shaking can be disabled by providing the --no-tree-shake-icons flag when building your app.
+Font asset "Phosphor-Thin.ttf" was tree-shaken, reducing it from 535152 to 5084 bytes (99.0% reduction). Tree-shaking can be disabled by providing the --no-tree-shake-icons flag when building your app.
+Font asset "Phosphor-Fill.ttf" was tree-shaken, reducing it from 449252 to 6396 bytes (98.6% reduction). Tree-shaking can be disabled by providing the --no-tree-shake-icons flag when building your app.
+Font asset "Phosphor-Duotone.ttf" was tree-shaken, reducing it from 567808 to 6268 bytes (98.9% reduction). Tree-shaking can be disabled by providing the --no-tree-shake-icons flag when building your app.
+Font asset "MaterialIcons-Regular.otf" was tree-shaken, reducing it from 1645184 to 1716 bytes (99.9% reduction). Tree-shaking can be disabled by providing the --no-tree-shake-icons flag when building your app.
+Font asset "Phosphor-Light.ttf" was tree-shaken, reducing it from 536628 to 5076 bytes (99.1% reduction). Tree-shaking can be disabled by providing the --no-tree-shake-icons flag when building your app.
+Font asset "Phosphor.ttf" was tree-shaken, reducing it from 488636 to 9584 bytes (98.0% reduction). Tree-shaking can be disabled by providing the --no-tree-shake-icons flag when building your app.
+flutter : The message 
+received from the 
+daemon indicates that 
+the daemon has 
+disappeared.
+At line:1 char:65
++ ... droid 
+Studio\jbr'; flutter 
+build apk --release > 
+build_log_3.txt 2>&1
++                     
+   ~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~
+    + CategoryInfo    
+          : NotSpeci  
+  fied: (The messag   
+ e rec...as disapp    
+eared.:String) []    
+, RemoteException
+    + FullyQualifiedE 
+   rrorId : NativeCo  
+  mmandError
+ 
+Build request sent: Bu
+ild{id=4622bc45-dc8e-4
+cdd-a225-e11147a095b3,
+ currentDir=C:\Users\c
+liff\Downloads\aquaVOL
+T\landlord_mobile\andr
+oid}
+Attempting to read 
+last messages from 
+the daemon log...
+Daemon pid: 21872
+  log file: C:\Users\c
+liff\.gradle\daemon\8.
+12\daemon-21872.out.lo
+g
+----- Last 20 lines 
+from daemon log file 
+- 
+daemon-21872.out.log 
+-----
+2025-12-27T07:20:13.75
+7+0300 [DEBUG] [org.gr
+adle.cache.internal.De
+faultFileLockManager] 
+Lock acquired on 
+daemon addresses 
+registry.
+2025-12-27T07:20:13.76
+0+0300 [DEBUG] [org.gr
+adle.cache.internal.De
+faultFileLockManager] 
+Releasing lock on 
+daemon addresses 
+registry.
+2025-12-27T07:20:13.76
+1+0300 [DEBUG] [org.gr
+adle.launcher.daemon.s
+erver.DaemonStateCoord
+inator] resetting 
+idle timer
+2025-12-27T07:20:13.76
+2+0300 [DEBUG] [org.gr
+adle.launcher.daemon.s
+erver.DaemonStateCoord
+inator] daemon is 
+running. Sleeping 
+until state changes.
+2025-12-27T07:20:13.76
+5+0300 [INFO] [org.gra
+dle.launcher.daemon.se
+rver.exec.StartBuildOr
+RespondWithBusy] 
+Daemon is about to 
+start building Build{i
+d=4622bc45-dc8e-4cdd-a
+225-e11147a095b3, curr
+entDir=C:\Users\cliff\
+Downloads\aquaVOLT\lan
+dlord_mobile\android}.
+ Dispatching build 
+started information...
+2025-12-27T07:20:13.76
+6+0300 [DEBUG] [org.gr
+adle.launcher.daemon.s
+erver.SynchronizedDisp
+atchConnection] 
+thread 32: 
+dispatching org.gradle
+.launcher.daemon.proto
+col.BuildStarted@47d86
+8ef
+2025-12-27T07:20:13.77
+4+0300 [DEBUG] [org.gr
+adle.launcher.daemon.s
+erver.exec.EstablishBu
+ildEnvironment] 
+Configuring env 
+variables: [PATH, USER
+DOMAIN_ROAMINGPROFILE,
+ PROCESSOR_LEVEL, 
+SYSTEMDRIVE, POWERSHEL
+L_EXECUTABLE, 
+SESSIONNAME, 
+ALLUSERSPROFILE, PROCE
+SSOR_ARCHITECTURE, 
+N8N_PORT, VSCODE_PYTHO
+N_AUTOACTIVATE_GUARD, 
+VSCODE_GIT_IPC_HANDLE,
+ DRIVERDATA, 
+PROGRAMFILES, 
+VSCODE_INJECTION, 
+PSMODULEPATH, 
+COLORTERM, 
+PROGRAMDATA, DIRNAME, 
+CHOCOLATEYLASTPATHUPDA
+TE, USERNAME, VSCODE_G
+IT_ASKPASS_NODE, 
+TERM_PROGRAM_VERSION, 
+CMD_LINE_ARGS, 
+GIT_ASKPASS, CHROME_CR
+ASHPAD_PIPE_NAME, 
+EXIT_WITH_ERRORLEVEL, 
+FPS_BROWSER_USER_PROFI
+LE_STRING, ONEDRIVE, 
+APP_HOME, 
+MINGIT_PATH, PATHEXT, 
+PAGER, SNAPSHOT_PATH, 
+SHARED_BIN, WINDIR, OR
+IGINAL_XDG_CURRENT_DES
+KTOP, HOMEPATH, 
+PROCESSOR_IDENTIFIER, 
+C:\USERS\CLIFF\APPDATA
+\ROAMING\NPM, PUBLIC, 
+CACHE_DIR, 
+ZES_ENABLE_SYSMAN, 
+_SKIP, LOCALAPPDATA, C
+OMMONPROGRAMFILES(X86)
+, USERDOMAIN, 
+DART_SDK_PATH, FPS_BRO
+WSER_APP_PROFILE_STRIN
+G, LOGONSERVER, 
+JAVA_HOME, 
+FLUTTER_TOOLS_DIR, 
+PROMPT, 
+PROGRAMFILES(X86), 
+FLUTTER_ROOT, LANG, VS
+CODE_GIT_ASKPASS_MAIN,
+ =C:, APPDATA, 
+PROGRAMW6432, 
+SYSTEMROOT, JAVA_EXE, 
+CHOCOLATEYINSTALL, VSC
+ODE_GIT_ASKPASS_EXTRA_
+ARGS, N8N_BASIC_AUTH_A
+CTIVE, DART, ANTIGRAVI
+TY_CLI_ALIAS, OS, 
+TERM_PROGRAM, 
+COMMONPROGRAMW6432, 
+COMPUTERNAME, 
+GEMINI_API_KEY, 
+COMMONPROGRAMFILES, 
+COMSPEC, N8N_BASIC_AUT
+H_PASSWORD, 
+PROCESSOR_REVISION, 
+CLASSPATH, 
+APP_BASE_NAME, 
+N8N_USER_FOLDER, 
+N8N_BASIC_AUTH_USER, 
+TEMP, FLUTTER_ALREADY_
+LOCKED, HOMEDRIVE, 
+USERPROFILE, TMP, 
+EFC_4152, 
+NUMBER_OF_PROCESSORS, 
+OPENAI_API_KEY, 
+ANTIGRAVITY_AGENT]
+2025-12-27T07:20:13.80
+5+0300 [DEBUG] [org.gr
+adle.launcher.daemon.s
+erver.exec.LogToClient
+] About to start 
+relaying all logs to 
+the client via the 
+connection.
+2025-12-27T07:20:13.80
+6+0300 [INFO] [org.gra
+dle.launcher.daemon.se
+rver.exec.LogToClient]
+ The client will now 
+receive all logging 
+from the daemon (pid: 
+21872). The daemon 
+log file: C:\Users\cli
+ff\.gradle\daemon\8.12
+\daemon-21872.out.log
+2025-12-27T07:20:13.81
+4+0300 [INFO] [org.gra
+dle.launcher.daemon.se
+rver.exec.LogAndCheckH
+ealth] Starting build 
+in new daemon 
+[memory: 8 GiB]
+2025-12-27T07:20:13.82
+5+0300 [DEBUG] [org.gr
+adle.launcher.daemon.s
+erver.exec.ExecuteBuil
+d] The daemon has 
+started executing the 
+build.
+2025-12-27T07:20:13.82
+8+0300 [DEBUG] [org.gr
+adle.launcher.daemon.s
+erver.exec.ExecuteBuil
+d] Executing build 
+with daemon context: D
+efaultDaemonContext[ui
+d=a2589cd6-4bdd-4c6d-b
+2a1-168027f96eb3,javaH
+ome=C:\Program 
+Files\Android\Android 
+Studio\jbr,javaVersion
+=21,javaVendor=JetBrai
+ns s.r.o.,daemonRegist
+ryDir=C:\Users\cliff\.
+gradle\daemon,pid=2187
+2,idleTimeout=10800000
+,priority=NORMAL,apply
+InstrumentationAgent=t
+rue,nativeServicesMode
+=ENABLED,daemonOpts=-X
+X:MaxMetaspaceSize=4G,
+-XX:ReservedCodeCacheS
+ize=512m,-XX:+HeapDump
+OnOutOfMemoryError,-Xm
+x8G,-Dfile.encoding=UT
+F-8,-Duser.country=US,
+-Duser.language=en,-Du
+ser.variant]
+Font asset 
+"CupertinoIcons.ttf" 
+was tree-shaken, 
+reducing it from 
+257628 to 848 bytes 
+(99.7% reduction). 
+Tree-shaking can be 
+disabled by providing 
+the 
+--no-tree-shake-icons 
+flag when building 
+your app.
+Font asset 
+"Phosphor-Bold.ttf" 
+was tree-shaken, 
+reducing it from 
+495308 to 4996 bytes 
+(99.0% reduction). 
+Tree-shaking can be 
+disabled by providing 
+the 
+--no-tree-shake-icons 
+flag when building 
+your app.
+Font asset 
+"Phosphor-Thin.ttf" 
+was tree-shaken, 
+reducing it from 
+535152 to 5084 bytes 
+(99.0% reduction). 
+Tree-shaking can be 
+disabled by providing 
+the 
+--no-tree-shake-icons 
+flag when building 
+your app.
+Font asset 
+"Phosphor-Fill.ttf" 
+was tree-shaken, 
+reducing it from 
+449252 to 6396 bytes 
+(98.6% reduction). 
+Tree-shaking can be 
+disabled by providing 
+the 
+--no-tree-shake-icons 
+flag when building 
+your app.
+Font asset "Phosphor-D
+uotone.ttf" was 
+tree-shaken, reducing 
+it from 567808 to 
+6268 bytes (98.9% 
+reduction). 
+Tree-shaking can be 
+disabled by providing 
+the 
+--no-tree-shake-icons 
+flag when building 
+your app.
+Font asset "MaterialIc
+ons-Regular.otf" was 
+tree-shaken, reducing 
+it from 1645184 to 
+1716 bytes (99.9% 
+reduction). 
+Tree-shaking can be 
+disabled by providing 
+the 
+--no-tree-shake-icons 
+flag when building 
+your app.
+Font asset 
+"Phosphor-Light.ttf" 
+was tree-shaken, 
+reducing it from 
+536628 to 5076 bytes 
+(99.1% reduction). 
+Tree-shaking can be 
+disabled by providing 
+the 
+--no-tree-shake-icons 
+flag when building 
+your app.
+Font asset 
+"Phosphor.ttf" was 
+tree-shaken, reducing 
+it from 488636 to 
+9584 bytes (98.0% 
+reduction). 
+Tree-shaking can be 
+disabled by providing 
+the 
+--no-tree-shake-icons 
+flag when building 
+your app.----- End of 
+the daemon log -----
+
+JVM crash log found: f
+ile:///C:/Users/cliff/
+Downloads/aquaVOLT/lan
+dlord_mobile/android/h
+s_err_pid21872.log
+
+FAILURE: Build failed 
+with an exception.
+
+* What went wrong:
+Gradle build daemon 
+disappeared 
+unexpectedly (it may 
+have been killed or 
+may have crashed)
+
+* Try:
+> Run with 
+--stacktrace option 
+to get the stack 
+trace.
+> Run with --info or 
+--debug option to get 
+more log output.
+> Run with --scan to 
+get full insights.
+> Get more help at htt
+ps://help.gradle.org.
+Running Gradle task 'assembleRelease'...                          484.2s
+Gradle task 
+assembleRelease 
+failed with exit code 
+1

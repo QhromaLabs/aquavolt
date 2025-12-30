@@ -12,7 +12,13 @@ import {
     Descriptions,
     Divider,
     Space,
-    Tag
+    Tag,
+    Alert,
+    Table,
+    Select,
+    Badge,
+    Tooltip,
+    Modal
 } from 'antd';
 import {
     UserOutlined,
@@ -22,13 +28,22 @@ import {
     MailOutlined,
     SafetyCertificateOutlined,
     ToolOutlined,
-    SettingOutlined
+    SettingOutlined,
+    ApiOutlined,
+    MessageOutlined,
+    KeyOutlined,
+    ThunderboltOutlined,
+    ReloadOutlined,
+    CheckCircleOutlined,
+    CloseCircleOutlined,
+    MinusCircleOutlined
 } from '@ant-design/icons';
 import MainLayout from '../../components/Layout/MainLayout';
 import { useAuth } from '../../hooks/useAuth';
 import { supabase } from '../../lib/supabase';
 
-const { Title, Text } = Typography;
+const { Title, Text, Paragraph } = Typography;
+const { TextArea } = Input;
 
 const Settings = () => {
     const { user, profile, refreshProfile } = useAuth();
@@ -45,8 +60,22 @@ const Settings = () => {
     const tariffKshPerKwh = Form.useWatch('tariff_ksh_per_kwh', systemForm);
     const [settingsLoading, setSettingsLoading] = useState(false);
 
+    // Automations Form
+    const [automationsForm] = Form.useForm();
+    const [automationsLoading, setAutomationsLoading] = useState(false);
+    const [verifying, setVerifying] = useState(false);
+    const [hasCredentials, setHasCredentials] = useState(false);
+
+    // SMS Logs State
+    const [smsLogs, setSmsLogs] = useState([]);
+    const [smsLogsLoading, setSmsLogsLoading] = useState(false);
+    const [statusFilter, setStatusFilter] = useState('all');
+    const [configureModalVisible, setConfigureModalVisible] = useState(false);
+
     useEffect(() => {
         fetchSystemSettings();
+        fetchCredentials();
+        fetchSmsLogs();
     }, []);
 
     const fetchSystemSettings = async () => {
@@ -69,6 +98,23 @@ const Settings = () => {
             }
         } catch (err) {
             console.error('Error fetching settings:', err);
+        }
+    };
+
+    const fetchCredentials = async () => {
+        try {
+            const { data, error } = await supabase
+                .from('api_credentials')
+                .select('credentials')
+                .eq('service_name', 'africastalking')
+                .single();
+
+            if (data && data.credentials) {
+                automationsForm.setFieldsValue(data.credentials);
+                setHasCredentials(true);
+            }
+        } catch (err) {
+            console.error('Error fetching automation credentials:', err);
         }
     };
 
@@ -95,7 +141,36 @@ const Settings = () => {
         }
     };
 
+    const handleSaveAutomations = async (values) => {
+        setAutomationsLoading(true);
+        try {
+            // Structure the data clearly
+            const credentialsPayload = {
+                username: values.username,
+                api_key: values.api_key,
+                sender_id: values.sender_id || '', // Optional
+                sms_template: values.sms_template || 'Token: {token}. Units: {units} KWh. Amount: KES {amount}. Meter: {meter}.' // Default
+            };
 
+            const { error } = await supabase
+                .from('api_credentials')
+                .upsert({
+                    service_name: 'africastalking',
+                    credentials: credentialsPayload,
+                    updated_at: new Date()
+                }, { onConflict: 'service_name' });
+
+            if (error) throw error;
+
+            message.success('Automation settings saved successfully');
+            setHasCredentials(true);
+        } catch (error) {
+            console.error('Error saving settings:', error);
+            message.error('Failed to save settings');
+        } finally {
+            setAutomationsLoading(false);
+        }
+    };
 
     useEffect(() => {
         if (profile) {
@@ -147,6 +222,31 @@ const Settings = () => {
             message.error('Failed to update password: ' + error.message);
         } finally {
             setLoading(false);
+        }
+    };
+
+    const fetchSmsLogs = async () => {
+        setSmsLogsLoading(true);
+        try {
+            let query = supabase
+                .from('sms_logs')
+                .select('*')
+                .order('created_at', { ascending: false })
+                .limit(50);
+
+            if (statusFilter !== 'all') {
+                query = query.eq('status', statusFilter);
+            }
+
+            const { data, error } = await query;
+
+            if (error) throw error;
+            setSmsLogs(data || []);
+        } catch (error) {
+            console.error('Error fetching SMS logs:', error);
+            message.error('Failed to load SMS logs');
+        } finally {
+            setSmsLogsLoading(false);
         }
     };
 
@@ -293,8 +393,296 @@ const Settings = () => {
                 </div>
             ),
         },
+        // Automations tab moved to modal in SMS Logs tab
+        /*
         {
             key: '3',
+            label: (
+                <span>
+                    <ThunderboltOutlined />
+                    Automations
+                </span>
+            ),
+            children: (
+                <div style={{ maxWidth: 800 }}>
+                    <Card
+                        title={<span><MessageOutlined /> Africa's Talking (SMS Gateway)</span>}
+                        extra={<a href="https://africastalking.com/" target="_blank" rel="noreferrer">Visit Website</a>}
+                        bordered={false}
+                    >
+                        <Alert
+                            message="SMS Automation"
+                            description="Configure your Africa's Talking credentials here to enable automated SMS notifications when tokens are generated."
+                            type="info"
+                            showIcon
+                            style={{ marginBottom: 24 }}
+                        />
+
+                        <Form
+                            form={automationsForm}
+                            layout="vertical"
+                            onFinish={handleSaveAutomations}
+                            initialValues={{
+                                sms_template: 'Token Generated! Token: {token}. Units: {units} KWh. Amount: KES {amount}. Meter: {meter}. Thank you.'
+                            }}
+                        >
+                            <Title level={5}>API Credentials</Title>
+                            <Form.Item
+                                name="username"
+                                label="Username"
+                                rules={[{ required: true, message: 'Please enter your Africa\'s Talking username' }]}
+                                extra="For sandbox, use 'sandbox'"
+                            >
+                                <Input prefix={<ApiOutlined />} placeholder="e.g. sandbox or your_app_username" />
+                            </Form.Item>
+
+                            <Form.Item
+                                name="api_key"
+                                label="API Key"
+                                rules={[{ required: true, message: 'Please enter your API Key' }]}
+                            >
+                                <Input.Password prefix={<KeyOutlined />} placeholder="Enter your API Key" />
+                            </Form.Item>
+
+                            <Form.Item
+                                name="sender_id"
+                                label="Sender ID (Optional)"
+                                extra="Leave blank to use the default sender ID (e.g., AFRICTALK or shortcode)"
+                            >
+                                <Input placeholder="e.g. AQUAVOLT" />
+                            </Form.Item>
+
+                            <Divider />
+
+                            <Title level={5}>Message Template</Title>
+                            <Paragraph type="secondary" style={{ fontSize: '13px' }}>
+                                Available variables: <Text code>{'{token}'}</Text>, <Text code>{'{units}'}</Text>, <Text code>{'{amount}'}</Text>, <Text code>{'{meter}'}</Text>, <Text code>{'{name}'}</Text>
+                            </Paragraph>
+
+                            <Form.Item
+                                name="sms_template"
+                                label="SMS Content"
+                                rules={[{ required: true, message: 'Please define the SMS template' }]}
+                            >
+                                <TextArea
+                                    rows={4}
+                                    placeholder="Enter the message content..."
+                                    showCount
+                                   maxLength={160}
+                                />
+                            </Form.Item>
+
+                            <Form.Item>
+                                <Space style={{ width: '100%' }}>
+                                    <Button
+                                        type="primary"
+                                        htmlType="submit"
+                                        icon={<SaveOutlined />}
+                                        loading={automationsLoading}
+                                        style={{ background: '#1ecf49', minWidth: 120 }}
+                                    >
+                                        Save Configuration
+                                    </Button>
+                                    <Button
+                                        type="default"
+                                        icon={<ApiOutlined />}
+                                        loading={verifying}
+                                        onClick={async () => {
+                                            try {
+                                                const values = await automationsForm.validateFields(['username', 'api_key']);
+                                                setVerifying(true);
+
+                                                // Call Supabase Edge Function to verify
+                                                const { data: { session } } = await supabase.auth.getSession();
+                                                const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/verify-at-credentials`, {
+                                                    method: 'POST',
+                                                    headers: {
+                                                        'Content-Type': 'application/json',
+                                                        'Authorization': `Bearer ${session?.access_token || import.meta.env.VITE_SUPABASE_ANON_KEY}`
+                                                    },
+                                                    body: JSON.stringify({
+                                                        username: values.username,
+                                                        apiKey: values.api_key
+                                                    })
+                                                });
+
+                                                const result = await res.json();
+
+                                                if (result.success) {
+                                                    message.success(`Verified! Balance: ${result.balance}`);
+                                                } else {
+                                                    message.error(`Verification Failed: ${result.message}`);
+                                                }
+                                            } catch (err) {
+                                                console.error('Verification error:', err);
+                                                message.error(err.message || 'Verification failed. Please check your console.');
+                                            } finally {
+                                                setVerifying(false);
+                                            }
+                                        }}
+                                    >
+                                        Verify Credentials
+                                    </Button>
+                                </Space>
+                            </Form.Item>
+                        </Form>
+                    </Card>
+                </div>
+            ),
+        },
+        */
+        {
+            key: 'sms-logs',
+            label: (
+                <span>
+                    <MessageOutlined />
+                    SMS Logs
+                </span>
+            ),
+            children: (
+                <Card
+                    title="SMS Delivery Logs"
+                    bordered={false}
+                    extra={
+                        <Space>
+                            <Button
+                                type="primary"
+                                icon={<SettingOutlined />}
+                                onClick={() => setConfigureModalVisible(true)}
+                            >
+                                Configure
+                            </Button>
+                            <Select
+                                value={statusFilter}
+                                onChange={(value) => {
+                                    setStatusFilter(value);
+                                    setTimeout(fetchSmsLogs, 100);
+                                }}
+                                style={{ width: 120 }}
+                            >
+                                <Select.Option value="all">All Status</Select.Option>
+                                <Select.Option value="success">Success</Select.Option>
+                                <Select.Option value="failed">Failed</Select.Option>
+                                <Select.Option value="skipped">Skipped</Select.Option>
+                            </Select>
+                            <Button
+                                icon={<ReloadOutlined />}
+                                onClick={fetchSmsLogs}
+                                loading={smsLogsLoading}
+                            >
+                                Refresh
+                            </Button>
+                        </Space>
+                    }
+                >
+                    <Table
+                        dataSource={smsLogs}
+                        loading={smsLogsLoading}
+                        rowKey="id"
+                        pagination={{ pageSize: 20 }}
+                        columns={[
+                            {
+                                title: 'Time',
+                                dataIndex: 'created_at',
+                                key: 'created_at',
+                                render: (date) => new Date(date).toLocaleString(),
+                                width: 180,
+                            },
+                            {
+                                title: 'Phone',
+                                dataIndex: 'phone_number',
+                                key: 'phone_number',
+                                render: (phone) => {
+                                    if (!phone || phone === 'unknown') return 'Unknown';
+                                    // Mask middle digits: +254***345678
+                                    return phone.length > 8
+                                        ? `${phone.slice(0, 7)}***${phone.slice(-6)}`
+                                        : phone;
+                                },
+                                width: 150,
+                            },
+                            {
+                                title: 'Status',
+                                dataIndex: 'status',
+                                key: 'status',
+                                render: (status) => {
+                                    const config = {
+                                        success: { color: 'success', icon: <CheckCircleOutlined />, text: 'Sent' },
+                                        failed: { color: 'error', icon: <CloseCircleOutlined />, text: 'Failed' },
+                                        skipped: { color: 'default', icon: <MinusCircleOutlined />, text: 'Skipped' },
+                                    };
+                                    const { color, icon, text } = config[status] || config.skipped;
+                                    return (
+                                        <Badge status={color} text={
+                                            <Space>
+                                                {icon}
+                                                {text}
+                                            </Space>
+                                        } />
+                                    );
+                                },
+                                width: 120,
+                            },
+                            {
+                                title: 'Message Preview',
+                                dataIndex: 'message',
+                                key: 'message',
+                                ellipsis: true,
+                                render: (msg) => (
+                                    <Tooltip title={msg}>
+                                        <Text>{msg?.substring(0, 50)}{msg?.length > 50 ? '...' : ''}</Text>
+                                    </Tooltip>
+                                ),
+                            },
+                            {
+                                title: 'Error',
+                                dataIndex: 'error_message',
+                                key: 'error_message',
+                                render: (error) => error ? (
+                                    <Tooltip title={error}>
+                                        <Text type="danger" ellipsis style={{ maxWidth: 200, display: 'block' }}>
+                                            {error.substring(0, 40)}{error.length > 40 ? '...' : ''}
+                                        </Text>
+                                    </Tooltip>
+                                ) : '-',
+                            },
+                        ]}
+                        expandable={{
+                            expandedRowRender: (record) => (
+                                <div style={{ paddingLeft: 24 }}>
+                                    <Descriptions size="small" column={1} bordered>
+                                        <Descriptions.Item label="Full Message">
+                                            {record.message}
+                                        </Descriptions.Item>
+                                        {record.error_message && (
+                                            <Descriptions.Item label="Full Error">
+                                                <Text type="danger">{record.error_message}</Text>
+                                            </Descriptions.Item>
+                                        )}
+                                        {record.response_data && (
+                                            <Descriptions.Item label="AT Response">
+                                                <pre style={{
+                                                    background: '#f5f5f5',
+                                                    padding: 8,
+                                                    borderRadius: 4,
+                                                    maxHeight: 200,
+                                                    overflow: 'auto',
+                                                    fontSize: 12
+                                                }}>
+                                                    {JSON.stringify(record.response_data, null, 2)}
+                                                </pre>
+                                            </Descriptions.Item>
+                                        )}
+                                    </Descriptions>
+                                </div>
+                            ),
+                        }}
+                    />
+                </Card>
+            )
+        },
+        {
+            key: '4',
             label: (
                 <span>
                     <SettingOutlined />
@@ -371,14 +759,142 @@ const Settings = () => {
     return (
         <MainLayout>
             <div style={{ marginBottom: 24 }}>
-                <Title level={2}>Account Settings</Title>
-                <Text type="secondary">Manage your profile details and security preferences.</Text>
+                <Title level={2}>Settings Place</Title>
+                <Text type="secondary">Manage your profile, security, and integration preferences.</Text>
             </div>
 
+
             <Tabs defaultActiveKey="1" items={items} />
+
+            {/* Automations Configuration Modal */}
+            <Modal
+                title="Configure SMS Automations"
+                open={configureModalVisible}
+                onCancel={() => setConfigureModalVisible(false)}
+                footer={null}
+                width={700}
+            >
+                <Card title="Africa's Talking API Credentials" bordered={false}>
+                    {hasCredentials && (
+                        <Alert
+                            message="Credentials Configured"
+                            description="Africa's Talking SMS notifications are active."
+                            type="success"
+                            showIcon
+                            style={{ marginBottom: 16 }}
+                        />
+                    )}
+
+                    <Form
+                        form={automationsForm}
+                        layout="vertical"
+                        onFinish={handleSaveAutomations}
+                    >
+                        <Form.Item
+                            name="username"
+                            label="Username"
+                            extra="Your Africa's Talking app username (e.g., Aquavoltsms200)"
+                            rules={[{ required: true, message: 'Username is required' }]}
+                        >
+                            <Input prefix={<UserOutlined />} placeholder="e.g., Aquavoltsms200" />
+                        </Form.Item>
+
+                        <Form.Item
+                            name="api_key"
+                            label="API Key"
+                            extra="Starts with atsk_"
+                            rules={[{ required: true, message: 'API Key is required' }]}
+                        >
+                            <Input.Password prefix={<KeyOutlined />} placeholder="atsk_..." />
+                        </Form.Item>
+
+                        <Form.Item
+                            name="sender_id"
+                            label="Sender ID (Optional)"
+                            extra="Custom sender ID (e.g., AQUAVOLT)"
+                        >
+                            <Input prefix={<MessageOutlined />} placeholder="e.g., AQUAVOLT" />
+                        </Form.Item>
+
+                        <Divider />
+
+                        <Form.Item
+                            name="sms_template"
+                            label="SMS Template"
+                            extra={
+                                <div>
+                                    Available placeholders: <Tag>{'{token}'}</Tag> <Tag>{'{units}'}</Tag> <Tag>{'{amount}'}</Tag> <Tag>{'{meter}'}</Tag> <Tag>{'{name}'}</Tag>
+                                </div>
+                            }
+                        >
+                            <TextArea
+                                rows={4}
+                                placeholder="Token Generated! Token: {token}. Units: {units} KWh. Amount: KES {amount}. Meter: {meter}. Thank you."
+                                maxLength={160}
+                                showCount
+                            />
+                        </Form.Item>
+
+                        <Form.Item>
+                            <Space>
+                                <Button
+                                    type="primary"
+                                    htmlType="submit"
+                                    icon={<SaveOutlined />}
+                                    loading={automationsLoading}
+                                >
+                                    Save Configuration
+                                </Button>
+                                <Button
+                                    icon={<ApiOutlined />}
+                                    loading={verifying}
+                                    onClick={async () => {
+                                        const values = await automationsForm.validateFields(['username', 'api_key']);
+                                        if (!values.username || !values.api_key) {
+                                            message.warning('Please fill in Username and API Key first');
+                                            return;
+                                        }
+
+                                        try {
+                                            setVerifying(true);
+
+                                            const { data: { session } } = await supabase.auth.getSession();
+                                            const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/verify-at-credentials`, {
+                                                method: 'POST',
+                                                headers: {
+                                                    'Content-Type': 'application/json',
+                                                    'Authorization': `Bearer ${session?.access_token || import.meta.env.VITE_SUPABASE_ANON_KEY}`
+                                                },
+                                                body: JSON.stringify({
+                                                    username: values.username,
+                                                    apiKey: values.api_key
+                                                })
+                                            });
+
+                                            const result = await res.json();
+
+                                            if (result.success) {
+                                                message.success(`Verified! Balance: ${result.balance}`);
+                                            } else {
+                                                message.error(`Verification Failed: ${result.message}`);
+                                            }
+                                        } catch (err) {
+                                            console.error('Verification error:', err);
+                                            message.error(err.message || 'Verification failed. Please check your console.');
+                                        } finally {
+                                            setVerifying(false);
+                                        }
+                                    }}
+                                >
+                                    Verify Credentials
+                                </Button>
+                            </Space>
+                        </Form.Item>
+                    </Form>
+                </Card>
+            </Modal>
         </MainLayout>
     );
 };
-
 
 export default Settings;

@@ -14,8 +14,12 @@ import {
     ThunderboltOutlined,
     ApiOutlined,
     RiseOutlined,
-    GlobalOutlined
+    GlobalOutlined,
+    BankOutlined,
+    AndroidOutlined
 } from '@ant-design/icons';
+
+
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
 import { useRole } from '../../hooks/useRole';
@@ -71,7 +75,10 @@ const MainLayout = ({ children }) => {
                 { key: '/admin/maintenance', icon: <ToolOutlined />, label: 'Maintenance Console' },
                 { key: '/admin/commissions', icon: <DollarOutlined />, label: 'Commission Engine' },
                 { key: '/admin/finance', icon: <RiseOutlined />, label: 'Finance' },
+                { key: '/admin/withdrawals', icon: <BankOutlined />, label: 'Withdrawals' },
                 { key: '/admin/futurise-sync', icon: <ApiOutlined />, label: 'Futurise Sync' },
+                { key: '/admin/app-update', icon: <AndroidOutlined />, label: 'App Update' },
+
                 { key: '/admin/settings', icon: <SettingOutlined />, label: 'Settings' },
             ];
         }
