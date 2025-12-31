@@ -31,4 +31,20 @@ export default defineConfig({
             }
         }
     },
+    build: {
+        rollupOptions: {
+            output: {
+                manualChunks: {
+                    // Vendor chunks - separate heavy dependencies
+                    'vendor-react': ['react', 'react-dom', 'react-router-dom'],
+                    'vendor-ui': ['antd'],
+                    'vendor-charts': ['recharts'],
+                    'vendor-animation': ['framer-motion'],
+                    'vendor-query': ['@tanstack/react-query'],
+                }
+            }
+        },
+        chunkSizeWarningLimit: 1000, // Warn for chunks > 1MB
+        sourcemap: false, // Disable sourcemaps in production for smaller bundle
+    }
 })
