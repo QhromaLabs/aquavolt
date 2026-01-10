@@ -22,8 +22,8 @@ const Login = () => {
 
             // Wait a moment for the profile to be fetched by useAuth
             setTimeout(() => {
-                // Redirect to root - the RLSGuard will handle role-based routing
-                navigate('/');
+                // Redirect to dashboard - RoleBasedRedirect will handle role-based routing
+                navigate('/dashboard');
             }, 500);
         } catch (error) {
             message.error(error.message || 'Login failed. Please check your credentials.');

@@ -22,7 +22,8 @@ import {
     DollarOutlined,
     BankOutlined,
     UserOutlined,
-    PhoneOutlined
+    PhoneOutlined,
+    DeleteOutlined
 } from '@ant-design/icons';
 import MainLayout from '../../components/Layout/MainLayout';
 import { supabase } from '../../lib/supabase';
@@ -62,26 +63,8 @@ const WithdrawalRequests = () => {
 
             if (error) throw error;
 
-            // Add demo data for testing
-            const demoRequest = {
-                id: 'demo-req-123',
-                created_at: new Date().toISOString(),
-                amount: 15600.00,
-                status: 'pending',
-                mpesa_number: '0712345678',
-                profile: {
-                    full_name: 'John Doe (Demo)',
-                    email: 'demo@example.com',
-                    phone: '0712345678',
-                    role: 'landlord'
-                }
-            };
-
-            // Combine real data with demo data
-            const allRequests = [demoRequest, ...data];
-
-            setRequests(allRequests);
-            calculateStats(allRequests);
+            setRequests(data);
+            calculateStats(data);
         } catch (error) {
             console.error('Error fetching withdrawals:', error);
             message.error('Failed to load withdrawal requests');
@@ -105,19 +88,6 @@ const WithdrawalRequests = () => {
         try {
             setProcessing(true);
 
-            // Handle demo request locally
-            if (id.toString().startsWith('demo-')) {
-                const updatedRequests = requests.map(r =>
-                    r.id === id ? { ...r, status: action, reviewed_at: new Date().toISOString() } : r
-                );
-                setRequests(updatedRequests);
-                calculateStats(updatedRequests);
-                message.success(`Demo request marked as ${action}`);
-                if (isModalOpen) closeModal();
-                return;
-            }
-
-            // Real update
             // Optimistic update
             const updatedRequests = requests.map(r =>
                 r.id === id ? { ...r, status: action, reviewed_at: new Date().toISOString() } : r
@@ -142,6 +112,26 @@ const WithdrawalRequests = () => {
             console.error(`Error processing request:`, error);
             message.error(`Failed to process request`);
             fetchRequests(); // Revert on error
+        } finally {
+            setProcessing(false);
+        }
+    };
+
+    const handleDelete = async (id) => {
+        try {
+            setProcessing(true);
+            const { error } = await supabase
+                .from('withdrawal_requests')
+                .delete()
+                .eq('id', id);
+
+            if (error) throw error;
+
+            message.success('Request deleted successfully');
+            fetchRequests(); // Refresh list
+        } catch (error) {
+            console.error('Error deleting request:', error);
+            message.error('Failed to delete request');
         } finally {
             setProcessing(false);
         }
@@ -245,7 +235,16 @@ const WithdrawalRequests = () => {
                             </Popconfirm>
                         </>
                     )}
-                    {record.status !== 'pending' && <Text type="secondary">-</Text>}
+
+                    <Popconfirm
+                        title="Delete Request"
+                        description="Are you sure you want to delete this requests? This cannot be undone."
+                        onConfirm={() => handleDelete(record.id)}
+                        okText="Yes, Delete"
+                        cancelText="No"
+                    >
+                        <Button type="text" danger icon={<DeleteOutlined />} />
+                    </Popconfirm>
                 </Space>
             ),
         },

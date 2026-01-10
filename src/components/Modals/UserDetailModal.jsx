@@ -1,4 +1,4 @@
-import { Modal, Descriptions, Table, Tag, Typography, Button, Space, Card, Divider } from 'antd';
+import { Modal, Descriptions, Table, Tag, Typography, Button, Space, Card, Divider, Popconfirm, message } from 'antd';
 import { HomeOutlined, ThunderboltOutlined, UserOutlined } from '@ant-design/icons';
 import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
@@ -25,6 +25,7 @@ const UserDetailModal = ({ user, visible, onClose }) => {
                 const { data: assignments, error: assignError } = await supabase
                     .from('unit_assignments')
                     .select(`
+                        id,
                         unit_id,
                         units (
                             id, label, meter_number,
@@ -50,7 +51,8 @@ const UserDetailModal = ({ user, visible, onClose }) => {
                         unitsWithDetails.push({
                             ...a.units,
                             property: a.units.properties,
-                            landlordName
+                            landlordName,
+                            assignmentId: a.id
                         });
                     }
                 }
@@ -126,6 +128,32 @@ const UserDetailModal = ({ user, visible, onClose }) => {
         }
     };
 
+    const handleRemoveUnit = async (assignmentId, unitId) => {
+        try {
+            // 1. Terminate Assignment
+            const { error: assignError } = await supabase
+                .from('unit_assignments')
+                .update({ status: 'terminated', end_date: new Date() })
+                .eq('id', assignmentId);
+
+            if (assignError) throw assignError;
+
+            // 2. Free up the unit
+            const { error: unitError } = await supabase
+                .from('units')
+                .update({ status: 'vacant' })
+                .eq('id', unitId);
+
+            if (unitError) throw unitError;
+
+            message.success('Unit removed successfully');
+            fetchDetails(); // Refresh list
+        } catch (error) {
+            console.error('Error removing unit:', error);
+            message.error('Failed to remove unit');
+        }
+    };
+
     const formatToken = (token) => {
         if (!token) return '-';
         const clean = token.toString().replace(/\D/g, '');
@@ -163,6 +191,21 @@ const UserDetailModal = ({ user, visible, onClose }) => {
                             { title: 'Landlord', render: (_, r) => r.landlordName },
                             { title: 'Unit', dataIndex: 'label' },
                             { title: 'Meter', dataIndex: 'meter_number' },
+                            {
+                                title: 'Action',
+                                key: 'action',
+                                render: (_, r) => (
+                                    <Popconfirm
+                                        title="Disconnect Unit"
+                                        description="Are you sure you want to disconnect this unit?"
+                                        onConfirm={() => handleRemoveUnit(r.assignmentId, r.id)}
+                                        okText="Yes"
+                                        cancelText="No"
+                                    >
+                                        <Button danger size="small">Remove</Button>
+                                    </Popconfirm>
+                                )
+                            }
                         ]}
                     />
 

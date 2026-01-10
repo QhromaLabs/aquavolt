@@ -52,11 +52,17 @@
 
 INSERT INTO api_credentials (service_name, credentials) VALUES
 ('futurise', '{
-  "base_url": "https://dlms.futurise-tech.com/api",
+  "base_url": "https://dlms.futurise-tech.com:4680/api",
   "vendor": "aquavolt",
   "password": "123456",
   "token": null,
-  "token_expires_at": null
+  "token_expires_at": null,
+  "endpoints": {
+    "captcha": "/v1/captcha",
+    "login": "/v1/login",
+    "charge": "/v1/meter-recharge/recharge-token/0",
+    "manage": "/v1/meter-recharge/meter-token/0"
+  }
 }'::jsonb),
 ('mpesa', '{
   "consumer_key": "Sk9iveI4ZAJ7PIbMyGgKLOozsd52xbCALmERpSzpif1V1gsd",

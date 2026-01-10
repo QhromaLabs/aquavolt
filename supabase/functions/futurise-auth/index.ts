@@ -103,12 +103,15 @@ serve(async (req) => {
         if (action === 'get_captcha') {
             console.log('Attempting to fetch captcha from:', `${base_url}${endpoints.captcha}`)
 
+            // Create HTTP client that accepts self-signed certificates (for Futurise API)
+            const client = Deno.createHttpClient({
+                // @ts-ignore - Deno types might not include this
+                caCerts: [],
+            });
+
             const captchaResponse = await fetch(`${base_url}${endpoints.captcha}`, {
                 method: 'GET',
-                // @ts-ignore - Deno specific option
-                ...(base_url.startsWith('https://') && base_url.includes('47.90.150.122') ? {
-                    agent: false
-                } : {})
+                client: client,
             })
 
             if (!captchaResponse.ok) {
@@ -132,8 +135,15 @@ serve(async (req) => {
             // Use provided creds or defaults
             // Actually commonly we use defaults from DB
 
+            // Create HTTP client that accepts self-signed certificates (for Futurise API)
+            const client = Deno.createHttpClient({
+                // @ts-ignore - Deno types might not include this
+                caCerts: [],
+            });
+
             const loginResponse = await fetch(`${base_url}${endpoints.login}`, {
                 method: 'POST',
+                client: client,
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     username: vendor,

@@ -21,56 +21,59 @@ const ENDPOINTS = {
 
 export const futuriseDev = {
     async getCaptcha() {
-        console.log('[Dev] Fetching Captcha...');
+        console.log('[Dev] Fetching Captcha (via Edge Function)...');
         try {
-            const captchaUrl = `${PROXY_BASE_URL}${ENDPOINTS.captcha}`;
-            const captchaRes = await fetch(captchaUrl);
-            if (!captchaRes.ok) throw new Error(`Captcha failed: ${captchaRes.status}`);
+            const { data, error } = await supabase.functions.invoke('futurise-auth', {
+                body: { action: 'get_captcha' }
+            });
 
-            const captchaData = await captchaRes.json();
-            console.log('[Dev] Captcha:', captchaData.id); // Don't log full data (image)
+            if (error) throw error;
+            if (!data.id) throw new Error('Invalid captcha response');
+
+            console.log('[Dev] Captcha:', data.id); // Don't log full data (image)
             return {
-                id: captchaData.id,
-                image: captchaData.data // Base64 string
+                id: data.id,
+                image: data.data // Base64 string
             };
         } catch (error) {
             console.error('[Dev] Captcha Error:', error);
-            return { error: error.message };
+            // Handle edge function error format
+            let msg = error.message;
+            try {
+                const body = typeof error === 'string' ? JSON.parse(error) : error;
+                if (body.message) msg = body.message;
+                if (body.error) msg = body.error;
+            } catch (e) { }
+            return { error: msg };
         }
     },
 
     async login(code, uuid) {
         console.log(`[Dev] Logging in with code: ${code}...`);
         try {
-            const loginUrl = `${PROXY_BASE_URL}${ENDPOINTS.login}`;
-            const loginRes = await fetch(loginUrl, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    username: VENDOR,
-                    password: PASSWORD,
-                    rememberMe: false,
-                    code: code,
-                    uuid: uuid
-                })
+            const { data, error } = await supabase.functions.invoke('futurise-auth', {
+                body: {
+                    action: 'login',
+                    code,
+                    uuid
+                }
             });
 
-            if (!loginRes.ok) {
-                const txt = await loginRes.text();
-                throw new Error(`Login failed: ${loginRes.status} ${txt}`);
+            if (error) {
+                const body = typeof error === 'string' ? JSON.parse(error) : error;
+                throw new Error(body.message || body.error || 'Login failed');
             }
 
-            const loginData = await loginRes.json();
-            console.log('[Dev] Login Response:', loginData);
+            console.log('[Dev] Login Response:', data);
 
-            if (!loginData.success || !loginData.token) {
-                throw new Error(loginData.msg || 'Login failed');
+            if (!data.success || !data.token) {
+                throw new Error(data.msg || 'Login failed');
             }
 
             return {
                 success: true,
-                token: loginData.token,
-                expires_at: loginData.expire
+                token: data.token,
+                expires_at: data.expires_at
             };
         } catch (error) {
             console.error('[Dev] Login Error:', error);
