@@ -20,7 +20,8 @@ import {
     EditOutlined,
     SearchOutlined,
     ReloadOutlined,
-    PlusOutlined
+    PlusOutlined,
+    KeyOutlined
 } from '@ant-design/icons';
 import MainLayout from '../../components/Layout/MainLayout';
 import { supabase } from '../../lib/supabase';
@@ -58,6 +59,12 @@ const UserManagement = () => {
     const [detailUser, setDetailUser] = useState(null);
     const [detailModalVisible, setDetailModalVisible] = useState(false);
 
+    // Password Reset State
+    const [resetModalVisible, setResetModalVisible] = useState(false);
+    const [resettingUser, setResettingUser] = useState(null);
+    const [resetLoading, setResetLoading] = useState(false);
+    const [resetForm] = Form.useForm();
+
     useEffect(() => {
         fetchUsers();
     }, []);
@@ -75,7 +82,7 @@ const UserManagement = () => {
             setUsers(data || []);
 
             // Fetch Properties (for Landlord assignment & Unit filtering)
-            const { data: propsData } = await supabase.from('properties').select('id, name, landlord_id');
+            const { data: propsData } = await supabase.from('properties').select('id, name, landlord_id, caretaker_id');
             setProperties(propsData || []);
 
             // Fetch Units (for Tenant assignment)
@@ -93,7 +100,7 @@ const UserManagement = () => {
     const handleEdit = async (user) => {
         // Create a copy to avoid mutating the original record
         const userToEdit = { ...user };
-        
+
         // Basic Fields
         const initialValues = {
             full_name: userToEdit.full_name,
@@ -109,7 +116,7 @@ const UserManagement = () => {
                 .eq('tenant_id', userToEdit.id)
                 .eq('status', 'active')
                 .maybeSingle();
-            
+
             if (data) {
                 initialValues.unit_id = data.unit_id;
                 initialValues.property_id = data.units?.property_id;
@@ -126,9 +133,24 @@ const UserManagement = () => {
                 .from('properties')
                 .select('id')
                 .eq('landlord_id', userToEdit.id);
-            
+
             if (data) {
                 initialValues.property_ids = data.map(p => p.id);
+            }
+        } else if (userToEdit.role === 'caretaker') {
+            // Fetch assigned property
+            const { data } = await supabase
+                .from('properties')
+                .select('id')
+                .eq('caretaker_id', userToEdit.id)
+                .maybeSingle();
+
+            if (data) {
+                initialValues.property_id = data.id;
+                // Currently assuming 1 caretaker per property (or 1 property per caretaker for simplicity)
+                userToEdit.current_property_id = data.id;
+            } else {
+                userToEdit.current_property_id = null;
             }
         }
 
@@ -187,9 +209,9 @@ const UserManagement = () => {
                         status: 'active',
                         start_date: new Date()
                     });
-                
+
                 if (assignError) message.error('User created but unit assignment failed.');
-                
+
                 // Update unit status to occupied
                 await supabase.from('units').update({ status: 'occupied' }).eq('id', values.unit_id);
             }
@@ -202,6 +224,15 @@ const UserManagement = () => {
                     .in('id', values.property_ids);
 
                 if (propError) message.error('User created but property assignment failed.');
+            }
+
+            if (values.role === 'caretaker' && values.property_id) {
+                const { error: careError } = await supabase
+                    .from('properties')
+                    .update({ caretaker_id: userId })
+                    .eq('id', values.property_id);
+
+                if (careError) message.error('User created but caretaker assignment failed.');
             }
 
             message.success('User created successfully!');
@@ -279,12 +310,57 @@ const UserManagement = () => {
                 }
             }
 
+            // 4. Handle Caretaker Property Changes
+            if (values.role === 'caretaker') {
+                // Check if property changed
+                if (editingUser.current_property_id !== values.property_id) {
+                    // Remove from old property
+                    if (editingUser.current_property_id) {
+                        await supabase.from('properties')
+                            .update({ caretaker_id: null })
+                            .eq('id', editingUser.current_property_id);
+                    }
+                    // Assign to new property
+                    if (values.property_id) {
+                        await supabase.from('properties')
+                            .update({ caretaker_id: editingUser.id })
+                            .eq('id', values.property_id);
+                    }
+                }
+            }
+
             message.success('User updated successfully');
             setEditModalVisible(false);
             fetchUsers();
         } catch (error) {
             console.error('Error updating user:', error);
             message.error('Failed to update user');
+        }
+    };
+
+    const handleResetPassword = async (values) => {
+        setResetLoading(true);
+        try {
+            const { data, error } = await supabase.functions.invoke('admin-reset-password', {
+                body: {
+                    userId: resettingUser.id,
+                    newPassword: values.password
+                }
+            });
+
+            if (error) throw error;
+            if (data?.success) {
+                message.success('Password reset successfully');
+                setResetModalVisible(false);
+                resetForm.resetFields();
+            } else {
+                throw new Error(data?.error || 'Failed to reset password');
+            }
+        } catch (error) {
+            console.error('Error resetting password:', error);
+            message.error(error.message || 'Failed to reset password');
+        } finally {
+            setResetLoading(false);
         }
     };
 
@@ -371,6 +447,16 @@ const UserManagement = () => {
                         onClick={() => handleEdit(record)}
                     >
                         Edit
+                    </Button>
+                    <Button
+                        type="link"
+                        icon={<KeyOutlined />}
+                        onClick={() => {
+                            setResettingUser(record);
+                            setResetModalVisible(true);
+                        }}
+                    >
+                        Reset Password
                     </Button>
                 </Space>
             ),
@@ -487,7 +573,7 @@ const UserManagement = () => {
                             if (role === 'tenant') {
                                 return (
                                     <>
-                                        <Divider style={{margin: '12px 0'}} orientation="left">Assignment</Divider>
+                                        <Divider style={{ margin: '12px 0' }} orientation="left">Assignment</Divider>
                                         <Form.Item name="property_id" label="Property" style={{ marginBottom: 8 }}>
                                             <Select
                                                 placeholder="Select Property"
@@ -514,7 +600,7 @@ const UserManagement = () => {
                                     </>
                                 );
                             }
-                             if (role === 'landlord') {
+                            if (role === 'landlord') {
                                 return (
                                     <Form.Item
                                         name="property_ids"
@@ -524,6 +610,23 @@ const UserManagement = () => {
                                             {properties.map(p => (
                                                 <Option key={p.id} value={p.id}>
                                                     {p.name} {p.landlord_id && p.landlord_id !== editingUser?.id ? '(Has Owner)' : ''}
+                                                </Option>
+                                            ))}
+                                        </Select>
+                                    </Form.Item>
+                                );
+                            }
+                            if (role === 'caretaker') {
+                                return (
+                                    <Form.Item
+                                        name="property_id"
+                                        label="Property to Manage"
+                                        help="Assign a property for this caretaker to manage."
+                                    >
+                                        <Select placeholder="Select Property" allowClear>
+                                            {properties.map(p => (
+                                                <Option key={p.id} value={p.id}>
+                                                    {p.name} {p.caretaker_id && p.caretaker_id !== editingUser?.id ? '(Has Caretaker)' : ''}
                                                 </Option>
                                             ))}
                                         </Select>
@@ -622,7 +725,7 @@ const UserManagement = () => {
                             if (role === 'tenant') {
                                 return (
                                     <>
-                                        <Divider style={{margin: '12px 0'}} orientation="left">Assignment</Divider>
+                                        <Divider style={{ margin: '12px 0' }} orientation="left">Assignment</Divider>
                                         <Form.Item label="Property" style={{ marginBottom: 8 }}>
                                             <Select
                                                 placeholder="Select Property first"
@@ -664,6 +767,23 @@ const UserManagement = () => {
                                     </Form.Item>
                                 );
                             }
+                            if (role === 'caretaker') {
+                                return (
+                                    <Form.Item
+                                        name="property_id"
+                                        label="Property to Manage"
+                                        help="Assign a property for this caretaker."
+                                    >
+                                        <Select placeholder="Select Property" allowClear>
+                                            {properties.map(p => (
+                                                <Option key={p.id} value={p.id}>
+                                                    {p.name} {p.caretaker_id ? '(Has Caretaker)' : ''}
+                                                </Option>
+                                            ))}
+                                        </Select>
+                                    </Form.Item>
+                                );
+                            }
                             return null;
                         }}
                     </Form.Item>
@@ -673,6 +793,54 @@ const UserManagement = () => {
                             <Button onClick={() => setCreateModalVisible(false)}>Cancel</Button>
                             <Button type="primary" htmlType="submit" loading={creating} style={{ background: '#1ecf49' }}>
                                 Create User
+                            </Button>
+                        </Space>
+                    </Form.Item>
+                </Form>
+            </Modal>
+
+            {/* Password Reset Modal */}
+            <Modal
+                title={`Reset Password for ${resettingUser?.full_name || 'User'}`}
+                open={resetModalVisible}
+                onCancel={() => {
+                    setResetModalVisible(false);
+                    resetForm.resetFields();
+                }}
+                footer={null}
+            >
+                <Alert
+                    message="Directly updates the user's password in Supabase Auth."
+                    type="warning"
+                    showIcon
+                    style={{ marginBottom: 16 }}
+                />
+                <Form
+                    form={resetForm}
+                    layout="vertical"
+                    onFinish={handleResetPassword}
+                >
+                    <Form.Item
+                        name="password"
+                        label="New Password"
+                        rules={[
+                            { required: true, message: 'Please input the new password!' },
+                            { min: 6, message: 'Password must be at least 6 characters!' }
+                        ]}
+                    >
+                        <Input.Password placeholder="Enter new password" />
+                    </Form.Item>
+
+                    <Form.Item style={{ marginBottom: 0, textAlign: 'right' }}>
+                        <Space>
+                            <Button onClick={() => setResetModalVisible(false)}>Cancel</Button>
+                            <Button
+                                type="primary"
+                                htmlType="submit"
+                                loading={resetLoading}
+                                style={{ background: '#1ecf49' }}
+                            >
+                                Update Password
                             </Button>
                         </Space>
                     </Form.Item>

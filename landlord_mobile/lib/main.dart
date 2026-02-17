@@ -18,6 +18,11 @@ import 'screens/wallet_screen.dart';
 import 'screens/tenants_screen.dart';
 import 'screens/reports_screen.dart';
 import 'widgets/scaffold_with_navbar.dart';
+import 'widgets/caretaker_scaffold_with_navbar.dart';
+import 'screens/caretaker_dashboard_screen.dart';
+import 'screens/caretaker_meters_screen.dart';
+import 'screens/caretaker_tenants_screen.dart';
+import 'screens/caretaker_profile_screen.dart';
 
 import 'constants.dart';
 
@@ -125,6 +130,46 @@ class LandlordApp extends StatelessWidget {
             ),
           ],
         ),
+
+        StatefulShellRoute.indexedStack(
+          builder: (context, state, navigationShell) {
+            return CaretakerScaffoldWithNavBar(navigationShell: navigationShell);
+          },
+          branches: [
+            StatefulShellBranch(
+              routes: [
+                GoRoute(
+                  path: '/caretaker/dashboard',
+                  builder: (context, state) => const CaretakerDashboardScreen(),
+                ),
+              ],
+            ),
+             StatefulShellBranch(
+              routes: [
+                GoRoute(
+                  path: '/caretaker/meters',
+                  builder: (context, state) => const CaretakerMetersScreen(),
+                ),
+              ],
+            ),
+             StatefulShellBranch(
+              routes: [
+                GoRoute(
+                  path: '/caretaker/tenants',
+                  builder: (context, state) => const CaretakerTenantsScreen(),
+                ),
+              ],
+            ),
+             StatefulShellBranch(
+              routes: [
+                GoRoute(
+                  path: '/caretaker/profile',
+                  builder: (context, state) => const CaretakerProfileScreen(),
+                ),
+              ],
+            ),
+          ],
+        ),
       ],
       redirect: (context, state) {
         final isAuthenticated = authProvider.isAuthenticated;
@@ -134,12 +179,24 @@ class LandlordApp extends StatelessWidget {
           return isLoggingIn ? null : '/login';
         }
 
+        final role = authProvider.role;
+
+        // If trying to access login page while authenticated
         if (isLoggingIn) {
+          if (role == 'caretaker') {
+            return '/caretaker/dashboard';
+          }
           return '/dashboard';
         }
         
-        // Ensure landlord role
-        // if (authProvider.role != null && authProvider.role != 'landlord') { ... }
+        // Role-based protection
+        if (role == 'caretaker' && !state.uri.path.startsWith('/caretaker')) {
+           return '/caretaker/dashboard';
+        }
+        
+        if (role == 'landlord' && state.uri.path.startsWith('/caretaker')) {
+           return '/dashboard';
+        }
 
         return null;
       },

@@ -25,10 +25,11 @@ class LandlordProvider extends ChangeNotifier {
 
   double get totalRevenue {
     final income = _topups.fold(0.0, (sum, item) => sum + (double.tryParse(item['amount_paid'].toString()) ?? 0.0));
+    final netIncome = income * 0.95; // 5% Commission
     final withdrawals = _withdrawalRequests
         .where((r) => ['pending', 'approved', 'completed'].contains(r['status']))
         .fold(0.0, (sum, item) => sum + (double.tryParse(item['amount'].toString()) ?? 0.0));
-    return income - withdrawals;
+    return netIncome - withdrawals;
   }
 
   List<Map<String, dynamic>> get allTransactions {
@@ -96,11 +97,12 @@ class LandlordProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
-      // 1. Fetch Properties owned by this landlord
+      // 1. Fetch Properties (Owned by Landlord OR Assigned to Caretaker)
+      // Using .or() filter to cover both cases in one query.
       final propertiesResponse = await _supabase
           .from('properties')
           .select('*')
-          .eq('landlord_id', user.id);
+          .or('landlord_id.eq.${user.id},caretaker_id.eq.${user.id}');
       
       _properties = List<Map<String, dynamic>>.from(propertiesResponse);
 
@@ -150,6 +152,12 @@ class LandlordProvider extends ChangeNotifier {
         } else {
           _units[i]['status'] = 'vacant';
         }
+      }
+
+      // Nest units into properties for easier UI consumption
+      for (var i = 0; i < _properties.length; i++) {
+        final propId = _properties[i]['id'];
+        _properties[i]['units'] = _units.where((u) => u['property_id'] == propId).toList();
       }
 
       // Create tenants list from assignments
