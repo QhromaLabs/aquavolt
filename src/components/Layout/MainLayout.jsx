@@ -158,17 +158,20 @@ const MainLayout = ({ children }) => {
             <Layout style={{ marginLeft: collapsed ? 80 : 200, transition: 'all 0.2s' }}>
                 <Header style={{
                     padding: '0 24px',
-                    background: '#fff',
+                    backgroundColor: '#fff',
                     display: 'flex',
                     justifyContent: 'space-between',
                     alignItems: 'center',
                     boxShadow: '0 1px 4px rgba(0,21,41,.08)',
+                    zIndex: 1,
                 }}>
-                    <Text strong style={{ fontSize: 18 }}>
-                        {profile?.full_name || 'User'}
-                    </Text>
+                    <div style={{ display: 'flex', alignItems: 'center' }}>
+                        <Text strong style={{ fontSize: 18, color: '#000000d9' }}>
+                            {profile?.full_name || 'User'}
+                        </Text>
+                    </div>
                     <Dropdown menu={userMenu} placement="bottomRight">
-                        <Button type="text" style={{ height: 'auto', padding: 8 }}>
+                        <Button type="text" style={{ height: 'auto', padding: 8, display: 'flex', alignItems: 'center' }}>
                             <Avatar style={{ backgroundColor: '#1ecf49' }}>
                                 {profile?.full_name?.charAt(0) || 'U'}
                             </Avatar>

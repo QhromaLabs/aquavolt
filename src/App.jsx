@@ -10,6 +10,7 @@ import TenantLogin from './pages/auth/TenantLogin';
 import SignUp from './pages/auth/SignUp';
 import Unauthorized from './pages/auth/Unauthorized';
 import LandingPage1 from './pages/public/LandingPage1';
+import DemoLandlordDashboard from './pages/public/DemoLandlordDashboard';
 
 // Admin pages - lazy load
 const AdminDashboard = lazy(() => import('./pages/admin/Dashboard'));
@@ -59,6 +60,7 @@ function App() {
                         <Route path="/portal" element={<TenantLogin />} />
                         <Route path="/signup" element={<SignUp />} />
                         <Route path="/landing-page-1" element={<LandingPage1 />} />
+                        <Route path="/demo/landlord" element={<DemoLandlordDashboard />} />
 
                         {/* Tenant Setup Route (potentially public or with minimal guard) */}
                         <Route path="/tenant/setup" element={

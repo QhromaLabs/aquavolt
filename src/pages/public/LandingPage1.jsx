@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, lazy, Suspense } from 'react';
 import { motion, useScroll, useTransform, AnimatePresence } from 'framer-motion';
 import {
     Building2,
@@ -22,6 +22,16 @@ import {
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 
+// Lazy load heavy sections
+const FeaturesSection = lazy(() => import('../../components/landing/FeaturesSection'));
+const MarketplaceSection = lazy(() => import('../../components/landing/MarketplaceSection'));
+const DownloadSection = lazy(() => import('../../components/landing/DownloadSection'));
+
+// Section Placeholder (Loading state)
+const SectionPlaceholder = () => (
+    <div className="py-24 animate-pulse bg-slate-900/10" />
+);
+
 const LandingPage1 = () => {
     const navigate = useNavigate();
     const { scrollY } = useScroll();
@@ -35,32 +45,15 @@ const LandingPage1 = () => {
     useEffect(() => {
         const fetchSettings = async () => {
             try {
-                const { data, error } = await supabase
-                    .from('admin_settings')
-                    .select('value')
-                    .eq('key', 'support_phone_whatsapp')
-                    .single();
+                const [phoneData, tenantData, landlordData] = await Promise.all([
+                    supabase.from('admin_settings').select('value').eq('key', 'support_phone_whatsapp').single(),
+                    supabase.from('admin_settings').select('value').eq('key', 'tenant_app_download_link').single(),
+                    supabase.from('admin_settings').select('value').eq('key', 'landlord_app_download_link').single()
+                ]);
 
-                if (data) {
-                    setContactInfo(prev => ({ ...prev, phone: data.value }));
+                if (phoneData.data) {
+                    setContactInfo(prev => ({ ...prev, phone: phoneData.data.value }));
                 }
-            } catch (err) {
-                console.error('Error fetching contact settings:', err);
-            }
-
-            // Fetch App Download Links from Google Drive
-            try {
-                const { data: tenantData } = await supabase
-                    .from('admin_settings')
-                    .select('value')
-                    .eq('key', 'tenant_app_download_link')
-                    .single();
-
-                const { data: landlordData } = await supabase
-                    .from('admin_settings')
-                    .select('value')
-                    .eq('key', 'landlord_app_download_link')
-                    .single();
 
                 // Convert Google Drive view links to direct download links
                 const convertToDirectDownloadLink = (driveLink) => {
@@ -73,11 +66,12 @@ const LandingPage1 = () => {
                 };
 
                 setAppUrls({
-                    tenant: convertToDirectDownloadLink(tenantData?.value),
-                    landlord: convertToDirectDownloadLink(landlordData?.value)
+                    tenant: convertToDirectDownloadLink(tenantData.data?.value),
+                    landlord: convertToDirectDownloadLink(landlordData.data?.value)
                 });
+
             } catch (err) {
-                console.error('Error fetching app URLs:', err);
+                console.error('Error fetching settings:', err);
             }
         };
         fetchSettings();
@@ -344,295 +338,19 @@ const LandingPage1 = () => {
             </section>
 
             {/* Features Grid */}
-            <section id="features" className="py-24 relative z-10">
-                <div className="max-w-7xl mx-auto px-6">
-                    <div className="text-center mb-16">
-                        <h2 className="text-3xl md:text-5xl font-bold mb-6">Built for Modern Living</h2>
-                        <p className="text-slate-400 max-w-2xl mx-auto">Everything you need to manage utilities efficiently, packaged in a beautiful interface.</p>
-                    </div>
-
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-                        {[
-                            {
-                                icon: <Zap className="w-8 h-8 text-yellow-400" />,
-                                title: "Instant Tokens",
-                                desc: "Purchase and receive utility tokens instantly via M-Pesa. No delays, 24/7 availability."
-                            },
-                            {
-                                icon: <BarChart3 className="w-8 h-8 text-blue-400" />,
-                                title: "Real-time Analytics",
-                                desc: "Track consumption patterns, revenue, and expenses with detailed interactive charts."
-                            },
-                            {
-                                icon: <ShieldCheck className="w-8 h-8 text-emerald-400" />,
-                                title: "Secure Payments",
-                                desc: "Bank-grade security for all transactions. Your financial data is protected at all times."
-                            },
-                            {
-                                icon: <Smartphone className="w-8 h-8 text-purple-400" />,
-                                title: "Mobile First",
-                                desc: "Native applications for both tenants and landlords. Manage everything on the go."
-                            },
-                            {
-                                icon: <Building2 className="w-8 h-8 text-pink-400" />,
-                                title: "Multi-Property",
-                                desc: "Seamlessly manage multiple properties and units from a single dashboard."
-                            },
-                            {
-                                icon: <Users className="w-8 h-8 text-orange-400" />,
-                                title: "Tenant Management",
-                                desc: "Digital tenant onboarding, automated invoicing, and communication tools."
-                            }
-                        ].map((feature, idx) => (
-                            <motion.div
-                                key={idx}
-                                initial={{ opacity: 0, y: 20 }}
-                                whileInView={{ opacity: 1, y: 0 }}
-                                viewport={{ once: true }}
-                                transition={{ delay: idx * 0.1 }}
-                                whileHover={{ y: -5 }}
-                                className="p-8 rounded-3xl bg-white/5 border border-white/5 hover:bg-white/10 hover:border-white/10 transition-all duration-300 group"
-                            >
-                                <div className="mb-6 p-4 rounded-2xl bg-slate-900/50 w-fit group-hover:scale-110 transition-transform duration-300 border border-white/5">
-                                    {feature.icon}
-                                </div>
-                                <h3 className="text-xl font-bold mb-3 text-white">{feature.title}</h3>
-                                <p className="text-slate-400 leading-relaxed">{feature.desc}</p>
-                            </motion.div>
-                        ))}
-                    </div>
-                </div>
-            </section>
+            <Suspense fallback={<SectionPlaceholder />}>
+                <FeaturesSection />
+            </Suspense>
 
             {/* Marketplace Section */}
-            <section id="marketplace" className="py-24 relative z-10 bg-gradient-to-b from-transparent to-blue-900/10">
-                <div className="max-w-7xl mx-auto px-6">
-                    <div className="text-center mb-16">
-                        <motion.div
-                            initial={{ opacity: 0, y: 20 }}
-                            whileInView={{ opacity: 1, y: 0 }}
-                            viewport={{ once: true }}
-                            className="inline-flex items-center px-4 py-2 rounded-full bg-[#1ECF49]/10 border border-[#1ECF49]/20 text-[#1ECF49] text-sm font-medium mb-4"
-                        >
-                            <ShoppingCart size={16} className="mr-2" />
-                            Official Hardware Shop
-                        </motion.div>
-                        <h2 className="text-3xl md:text-5xl font-bold mb-6">Get Your Prepaid Submeter</h2>
-                        <p className="text-slate-400 max-w-2xl mx-auto">
-                            High-quality, reliable hardware for your property. Ready for instant integration with the aquaVOLT platform.
-                        </p>
-                    </div>
-
-                    <div className="max-w-4xl mx-auto">
-                        <motion.div
-                            initial={{ opacity: 0, scale: 0.95 }}
-                            whileInView={{ opacity: 1, scale: 1 }}
-                            viewport={{ once: true }}
-                            className="bg-slate-900/50 backdrop-blur-xl border border-white/10 rounded-[2.5rem] overflow-hidden shadow-2xl flex flex-col md:flex-row"
-                        >
-                            <div className="md:w-1/2 relative bg-white/5 flex items-center justify-center p-8">
-                                <motion.img
-                                    whileHover={{ scale: 1.05 }}
-                                    transition={{ duration: 0.5 }}
-                                    src="/submeter.jpg"
-                                    alt="FUTURISE DPM16 Prepaid Submeter"
-                                    className="w-full h-auto object-contain rounded-2xl shadow-lg"
-                                />
-                                <div className="absolute top-4 left-4 bg-blue-600 text-white text-xs font-bold px-3 py-1 rounded-full uppercase tracking-wider">
-                                    Best Seller
-                                </div>
-                            </div>
-
-                            <div className="md:w-1/2 p-8 md:p-12 flex flex-col justify-center">
-                                <div className="space-y-6">
-                                    <div>
-                                        <h3 className="text-2xl md:text-3xl font-bold text-white mb-2">FUTURISE DPM16</h3>
-                                        <p className="text-slate-400 text-sm font-medium uppercase tracking-widest mb-4">Single Phase Prepaid Energy Meter</p>
-                                        <div className="flex items-baseline gap-2 mb-2">
-                                            <span className="text-4xl font-bold text-white">KSh 6,600</span>
-                                            <span className="text-slate-500 text-sm line-through">KSh 7,500</span>
-                                        </div>
-                                        <div className="inline-flex items-center text-[#1ECF49] text-sm font-semibold bg-[#1ECF49]/10 px-3 py-1 rounded-md">
-                                            <Zap size={14} className="mr-1" />
-                                            Installation fee: KSh 400
-                                        </div>
-                                    </div>
-
-                                    <div className="space-y-4 pt-4 border-t border-white/5">
-                                        <p className="text-slate-300 text-sm leading-relaxed">
-                                            The FUTURISE DPM16 is a high-precision single-phase prepaid meter designed for modern property management.
-                                            Features include anti-tamper security, easy installation, and full compatibility with the aquaVOLT token system.
-                                        </p>
-
-                                        <div className="grid grid-cols-2 gap-4">
-                                            <div className="flex items-center gap-2 text-xs text-slate-400">
-                                                <CheckCircle2 size={14} className="text-[#1ECF49]" />
-                                                STS Compliant
-                                            </div>
-                                            <div className="flex items-center gap-2 text-xs text-slate-400">
-                                                <CheckCircle2 size={14} className="text-[#1ECF49]" />
-                                                Easy Installation
-                                            </div>
-                                            <div className="flex items-center gap-2 text-xs text-slate-400">
-                                                <CheckCircle2 size={14} className="text-[#1ECF49]" />
-                                                Tamper Detection
-                                            </div>
-                                            <div className="flex items-center gap-2 text-xs text-slate-400">
-                                                <CheckCircle2 size={14} className="text-[#1ECF49]" />
-                                                Reliable & Durable
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    <div className="flex flex-col sm:flex-row gap-4 pt-6">
-                                        <a
-                                            href="https://wa.me/254725016527?text=Hello%20AquaVolt,%20I'm%20interested%20in%20purchasing%20the%20FUTURISE%20DPM16%20Prepaid%20Submeter."
-                                            target="_blank"
-                                            rel="noreferrer"
-                                            className="flex-1 bg-[#1ECF49] hover:bg-[#1ab540] text-white px-6 py-4 rounded-2xl font-bold text-center transition-all flex items-center justify-center gap-2 shadow-lg shadow-[#1ECF49]/20 no-underline"
-                                        >
-                                            <MessageSquare size={20} />
-                                            WhatsApp Us
-                                        </a>
-                                        <a
-                                            href="tel:+254725016527"
-                                            className="flex-1 bg-white/5 hover:bg-white/10 text-white border border-white/10 px-6 py-4 rounded-2xl font-bold text-center transition-all flex items-center justify-center gap-2 no-underline"
-                                        >
-                                            <PhoneCall size={20} />
-                                            Call Support
-                                        </a>
-                                    </div>
-                                </div>
-                            </div>
-                        </motion.div>
-                    </div>
-                </div>
-            </section>
+            <Suspense fallback={<SectionPlaceholder />}>
+                <MarketplaceSection />
+            </Suspense>
 
             {/* App Download Section */}
-            <section id="download" className="py-32 relative z-10 overflow-hidden">
-                <div className="absolute inset-0 bg-blue-600/10 skew-y-3 transform origin-bottom-left" />
-
-                <div className="max-w-7xl mx-auto px-6 relative">
-                    <div className="grid lg:grid-cols-2 gap-16 items-center">
-                        <motion.div
-                            initial={{ opacity: 0, x: -50 }}
-                            whileInView={{ opacity: 1, x: 0 }}
-                            viewport={{ once: true }}
-                            className="space-y-8"
-                        >
-                            <h2 className="text-4xl md:text-6xl font-bold leading-tight">
-                                Manage your world<br />
-                                <span className="text-blue-500">from your pocket.</span>
-                            </h2>
-                            <p className="text-lg text-slate-300">
-                                Download our dedicated mobile apps for a seamless experience. Whether you're a landlord managing properties or a tenant tracking usage, we've got you covered.
-                            </p>
-
-                            <div className="flex flex-col sm:flex-row gap-6 pt-4">
-                                {/* Tenant App Button */}
-                                <motion.a
-                                    href={appUrls.tenant}
-                                    download="AquaVolt_Tenant.apk"
-                                    whileHover={{ scale: 1.05 }}
-                                    whileTap={{ scale: 0.95 }}
-                                    className="flex items-center gap-4 bg-white text-slate-900 px-8 py-4 rounded-2xl shadow-xl hover:shadow-2xl transition-all cursor-pointer"
-                                >
-                                    <Download className="w-8 h-8" />
-                                    <div className="text-left">
-                                        <div className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Download For</div>
-                                        <div className="text-xl font-bold">Tenants</div>
-                                    </div>
-                                </motion.a>
-
-                                {/* Landlord App Button */}
-                                <motion.a
-                                    href={appUrls.landlord}
-                                    download="AquaVolt_Landlord.apk"
-                                    whileHover={{ scale: 1.05 }}
-                                    whileTap={{ scale: 0.95 }}
-                                    className="flex items-center gap-4 bg-slate-800 text-white border border-slate-700 px-8 py-4 rounded-2xl shadow-xl hover:shadow-2xl hover:bg-slate-700 transition-all cursor-pointer"
-                                >
-                                    <Download className="w-8 h-8" />
-                                    <div className="text-left">
-                                        <div className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Download For</div>
-                                        <div className="text-xl font-bold">Landlords</div>
-                                    </div>
-                                </motion.a>
-                            </div>
-
-                            <div className="flex items-center justify-center gap-6 pt-8 text-sm text-slate-500 text-center sm:text-left flex-wrap">
-                                <div className="flex items-center gap-2">
-                                    <CheckCircle2 className="w-4 h-4 text-emerald-500" /> iOS & Android
-                                </div>
-                                <div className="flex items-center gap-2">
-                                    <CheckCircle2 className="w-4 h-4 text-emerald-500" /> Free Updates
-                                </div>
-                                <div className="flex items-center gap-2">
-                                    <ShieldCheck className="w-5 h-5 text-[#1ECF49]" />
-                                    <span className="text-[#1ECF49] font-semibold">Secure & Verified</span>
-                                </div>
-                            </div>
-
-                            {/* Security Assurance */}
-                            <div className="mt-8 p-4 bg-emerald-500/10 border border-emerald-500/20 rounded-xl">
-                                <div className="flex items-start gap-3">
-                                    <ShieldCheck className="w-6 h-6 text-emerald-400 flex-shrink-0 mt-0.5" />
-                                    <div>
-                                        <h4 className="text-white font-semibold mb-1">Bank-Grade Security</h4>
-                                        <p className="text-slate-400 text-sm leading-relaxed">
-                                            Our apps are protected with end-to-end encryption and secure authentication.
-                                            Your data and payments are always safe with industry-standard security protocols.
-                                        </p>
-                                    </div>
-                                </div>
-                            </div>
-                        </motion.div>
-
-                        {/* App Screens Visual */}
-                        <motion.div
-                            initial={{ opacity: 0, x: 50 }}
-                            whileInView={{ opacity: 1, x: 0 }}
-                            viewport={{ once: true }}
-                            className="relative lg:h-[600px] flex items-center justify-center p-10"
-                        >
-                            {/* Decorative Circles */}
-                            <div className="absolute w-[500px] h-[500px] bg-gradient-to-r from-blue-500/20 to-purple-500/20 rounded-full blur-[60px] animate-spin-slow" />
-
-                            {/* Phone Mockup 1 */}
-                            <motion.div
-                                initial={{ y: 50 }}
-                                animate={{ y: [0, -20, 0] }}
-                                transition={{ repeat: Infinity, duration: 6, ease: "easeInOut" }}
-                                className="relative z-20 w-[280px] h-[580px] bg-slate-900 border-[8px] border-slate-800 rounded-[3rem] overflow-hidden shadow-2xl"
-                            >
-                                <div className="absolute top-0 inset-x-0 h-6 bg-slate-800 rounded-b-xl z-20 w-40 mx-auto" />
-                                <div className="w-full h-full bg-slate-800 p-4 space-y-4 pt-12">
-                                    {/* Fake UI */}
-                                    <div className="flex justify-between items-center">
-                                        <div className="w-8 h-8 bg-slate-700 rounded-full" />
-                                        <div className="w-20 h-4 bg-slate-700 rounded-full" />
-                                    </div>
-                                    <div className="w-full h-40 bg-gradient-to-br from-blue-600 to-indigo-600 rounded-2xl" />
-                                    <div className="space-y-3">
-                                        <div className="w-full h-12 bg-slate-700/50 rounded-xl" />
-                                        <div className="w-full h-12 bg-slate-700/50 rounded-xl" />
-                                        <div className="w-full h-12 bg-slate-700/50 rounded-xl" />
-                                    </div>
-                                </div>
-                            </motion.div>
-
-                            {/* Phone Mockup 2 (Behind) */}
-                            <motion.div
-                                initial={{ rotate: -10, x: -100 }}
-                                className="absolute z-10 w-[260px] h-[540px] bg-slate-900/80 border-[8px] border-slate-800/80 rounded-[3rem] overflow-hidden blur-[1px] -translate-x-32"
-                            >
-                                <div className="w-full h-full bg-slate-800/80"></div>
-                            </motion.div>
-                        </motion.div>
-                    </div>
-                </div>
-            </section>
+            <Suspense fallback={<SectionPlaceholder />}>
+                <DownloadSection appUrls={appUrls} />
+            </Suspense>
 
 
             {/* Footer */}

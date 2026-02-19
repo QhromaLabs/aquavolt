@@ -34,13 +34,22 @@ export default defineConfig({
     build: {
         rollupOptions: {
             output: {
-                manualChunks: {
-                    // Vendor chunks - separate heavy dependencies
-                    'vendor-react': ['react', 'react-dom', 'react-router-dom'],
-                    'vendor-ui': ['antd'],
-                    'vendor-charts': ['recharts'],
-                    'vendor-animation': ['framer-motion'],
-                    'vendor-query': ['@tanstack/react-query'],
+                manualChunks(id) {
+                    if (id.includes('node_modules')) {
+                        if (id.includes('react') || id.includes('framer-motion')) {
+                            return 'vendor-core';
+                        }
+                        if (id.includes('antd') || id.includes('@ant-design')) {
+                            return 'vendor-ui';
+                        }
+                        if (id.includes('recharts')) {
+                            return 'vendor-charts';
+                        }
+                        if (id.includes('supabase')) {
+                            return 'vendor-backend';
+                        }
+                        return 'vendor';
+                    }
                 }
             }
         },

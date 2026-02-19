@@ -6,16 +6,19 @@ import {
     TeamOutlined,
     ApiOutlined,
     HomeOutlined,
-    RiseOutlined
+    RiseOutlined,
+    UserAddOutlined,
+    SyncOutlined,
+    ToolOutlined
 } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import MainLayout from '../../components/Layout/MainLayout';
 import { supabase } from '../../lib/supabase';
-import StatCard from './components/StatCard';
-import RevenueTrendsChart from './components/RevenueTrendsChart';
-import RecentTransactions from './components/RecentTransactions';
-import TopProperties from './components/TopProperties';
-import QuickActions from './components/QuickActions';
+import StatCard from '../../components/Dashboard/StatCard';
+import RevenueTrendsChart from '../../components/Dashboard/RevenueTrendsChart';
+import RecentTransactions from '../../components/Dashboard/RecentTransactions';
+import TopProperties from '../../components/Dashboard/TopProperties';
+import QuickActions from '../../components/Dashboard/QuickActions';
 
 const { Title } = Typography;
 
@@ -30,6 +33,7 @@ const AdminDashboard = () => {
         totalUsers: 0,
         totalProperties: 0,
         avgTokenValue: 0,
+        netIncome: 0,
         revenueGrowth: 0
     });
     const [chartData, setChartData] = useState([]);
@@ -111,6 +115,7 @@ const AdminDashboard = () => {
                 totalUsers: userCount || 0,
                 totalProperties: propCount || 0,
                 avgTokenValue,
+                netIncome: totalRevenue * 0.05,
                 revenueGrowth: parseFloat(revenueGrowth)
             });
 
@@ -194,6 +199,46 @@ const AdminDashboard = () => {
         }
     };
 
+    const quickActions = [
+        {
+            icon: UserAddOutlined,
+            label: 'Add User',
+            gradient: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+            onClick: () => navigate('/admin/users')
+        },
+        {
+            icon: HomeOutlined,
+            label: 'Add Property',
+            gradient: 'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)',
+            onClick: () => navigate('/admin/properties')
+        },
+        {
+            icon: ToolOutlined,
+            label: 'Maintenance Token',
+            gradient: 'linear-gradient(135deg, #fa709a 0%, #fee140 100%)',
+            onClick: () => navigate('/admin/maintenance')
+        },
+        {
+            icon: DollarOutlined,
+            label: 'Finance Report',
+            gradient: 'linear-gradient(135deg, #1ecf49 0%, #36ea98 100%)',
+            onClick: () => navigate('/admin/finance')
+        },
+        {
+            icon: SyncOutlined,
+            label: 'Sync Futurise',
+            gradient: 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)',
+            onClick: () => navigate('/admin/futurise')
+        },
+        {
+            icon: ThunderboltOutlined,
+            label: 'View Topups',
+            gradient: 'linear-gradient(135deg, #ffa751 0%, #ffe259 100%)',
+            onClick: () => navigate('/admin/topups')
+        }
+    ];
+
+
     return (
         <MainLayout>
             <div style={{ marginBottom: 24 }}>
@@ -263,19 +308,21 @@ const AdminDashboard = () => {
                         </Col>
                         <Col xs={24} sm={12} lg={6}>
                             <StatCard
+                                title="Aquavolt Net (5%)"
+                                value={stats.netIncome}
+                                prefix="KES "
+                                icon={DollarOutlined}
+                                gradient="green"
+                                formatter={(val) => val.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                            />
+                        </Col>
+                        <Col xs={24} sm={12} lg={6}>
+                            <StatCard
                                 title="Avg Token Value"
                                 value={stats.avgTokenValue}
                                 prefix="KES "
                                 gradient="blue"
                                 formatter={(val) => val.toFixed(2)}
-                            />
-                        </Col>
-                        <Col xs={24} sm={12} lg={6}>
-                            <StatCard
-                                title="Tokens Today"
-                                value={stats.todayTokens}
-                                icon={ThunderboltOutlined}
-                                gradient="green"
                             />
                         </Col>
                         <Col xs={24} sm={12} lg={6}>
@@ -295,7 +342,7 @@ const AdminDashboard = () => {
                             <RevenueTrendsChart data={chartData} />
                         </Col>
                         <Col xs={24} lg={8}>
-                            <QuickActions />
+                            <QuickActions actions={quickActions} />
                         </Col>
                     </Row>
 

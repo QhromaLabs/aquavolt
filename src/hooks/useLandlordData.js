@@ -9,12 +9,15 @@ export const useLandlordData = () => {
     const [tenants, setTenants] = useState([]);
     const [meters, setMeters] = useState([]);
     const [transactions, setTransactions] = useState([]);
+    const [chartData, setChartData] = useState([]);
     const [stats, setStats] = useState({
         totalRevenue: 0,
         monthlyRevenue: 0,
+        todayRevenue: 0,
         propertyCount: 0,
         tenantCount: 0,
-        meterCount: 0
+        meterCount: 0,
+        revenueGrowth: 0
     });
 
     const fetchData = useCallback(async () => {
@@ -167,7 +170,44 @@ export const useLandlordData = () => {
                 .filter(t => t.created_at >= startOfMonth)
                 .reduce((acc, t) => acc + (parseFloat(t.amount_paid) || 0), 0);
 
-            // 6. Attach derived units to properties
+            // Calculate today's revenue
+            const today = new Date().toISOString().split('T')[0];
+            const todayRev = allTopups
+                .filter(t => t.created_at.startsWith(today))
+                .reduce((acc, t) => acc + (parseFloat(t.amount_paid) || 0), 0);
+
+            // Calculate revenue growth (last 7 days vs previous 7 days)
+            const last7Days = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+            const last14Days = new Date(Date.now() - 14 * 24 * 60 * 60 * 1000).toISOString();
+            const recentRevenue = allTopups
+                .filter(t => t.created_at >= last7Days)
+                .reduce((acc, t) => acc + (parseFloat(t.amount_paid) || 0), 0);
+            const previousRevenue = allTopups
+                .filter(t => t.created_at >= last14Days && t.created_at < last7Days)
+                .reduce((acc, t) => acc + (parseFloat(t.amount_paid) || 0), 0);
+            const revenueGrowth = previousRevenue > 0
+                ? ((recentRevenue - previousRevenue) / previousRevenue * 100).toFixed(1)
+                : 0;
+
+            // 6. Prepare chart data (last 30 days)
+            const last30Days = [];
+            for (let i = 29; i >= 0; i--) {
+                const date = new Date();
+                date.setDate(date.getDate() - i);
+                const dateStr = date.toISOString().split('T')[0];
+
+                const dayTopups = allTopups.filter(t => t.created_at.startsWith(dateStr));
+                const dayRevenue = dayTopups.reduce((acc, t) => acc + (parseFloat(t.amount_paid) || 0), 0);
+
+                last30Days.push({
+                    date: dateStr,
+                    revenue: dayRevenue,
+                    token_count: dayTopups.length
+                });
+            }
+            setChartData(last30Days);
+
+            // 7. Attach derived units to properties
             const propertiesWithUnits = props.map(p => ({
                 ...p,
                 units: unitsWithDerivedStatus.filter(u => u.property_id === p.id)
@@ -180,9 +220,11 @@ export const useLandlordData = () => {
             setStats({
                 totalRevenue: totalRev,
                 monthlyRevenue: monthlyRev,
+                todayRevenue: todayRev,
                 propertyCount: props.length,
                 tenantCount: activeTenants.length,
-                meterCount: allUnits.length
+                meterCount: allUnits.length,
+                revenueGrowth: parseFloat(revenueGrowth)
             });
 
         } catch (error) {
@@ -204,6 +246,7 @@ export const useLandlordData = () => {
         tenants,
         meters,
         transactions,
+        chartData,
         stats,
         refreshData
     };

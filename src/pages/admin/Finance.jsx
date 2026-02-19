@@ -49,7 +49,8 @@ const AdminFinance = () => {
         totalRevenue: 0,
         todayRevenue: 0,
         avgTransaction: 0,
-        totalTransactions: 0
+        totalTransactions: 0,
+        netIncome: 0
     });
 
     useEffect(() => {
@@ -92,7 +93,8 @@ const AdminFinance = () => {
             totalRevenue: total,
             todayRevenue: todayTotal,
             avgTransaction: data.length ? total / data.length : 0,
-            totalTransactions: data.length
+            totalTransactions: data.length,
+            netIncome: total * 0.05
         });
 
         // 2. Prepare Chart Data (Group by Date)
@@ -164,40 +166,51 @@ const AdminFinance = () => {
 
             {/* Stats Cards */}
             <Row gutter={[16, 16]} style={{ marginBottom: 24 }}>
-                <Col xs={24} sm={6}>
+                <Col xs={24} sm={12} md={5}>
                     <Card bordered={false} style={{ background: '#f6ffed', border: '1px solid #b7eb8f' }}>
                         <Statistic
                             title="Total Revenue"
                             value={stats.totalRevenue}
                             precision={2}
-                            prefix="KES"
+                            prefix="KES "
                             valueStyle={{ color: '#3f8600' }}
                         />
                     </Card>
                 </Col>
-                <Col xs={24} sm={6}>
+                <Col xs={24} sm={12} md={5}>
+                    <Card bordered={false} style={{ background: '#e6f7ff', border: '1px solid #91d5ff' }}>
+                        <Statistic
+                            title="Net Income (5%)"
+                            value={stats.netIncome}
+                            precision={2}
+                            prefix="KES "
+                            valueStyle={{ color: '#0050b3' }}
+                        />
+                    </Card>
+                </Col>
+                <Col xs={24} sm={12} md={5}>
                     <Card>
                         <Statistic
                             title="Today's Revenue"
                             value={stats.todayRevenue}
                             precision={2}
-                            prefix="KES"
+                            prefix="KES "
                             valueStyle={{ color: '#1890ff' }}
                             suffix={stats.todayRevenue > 0 ? <RiseOutlined style={{ color: 'green' }} /> : null}
                         />
                     </Card>
                 </Col>
-                <Col xs={24} sm={6}>
+                <Col xs={24} sm={12} md={4}>
                     <Card>
                         <Statistic
                             title="Avg. Transaction"
                             value={stats.avgTransaction}
                             precision={2}
-                            prefix="KES"
+                            prefix="KES "
                         />
                     </Card>
                 </Col>
-                <Col xs={24} sm={6}>
+                <Col xs={24} sm={12} md={5}>
                     <Card>
                         <Statistic
                             title="Total Transactions"
