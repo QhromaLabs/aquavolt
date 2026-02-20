@@ -36,25 +36,34 @@ export default defineConfig({
             output: {
                 manualChunks(id) {
                     if (id.includes('node_modules')) {
-                        // Group React and core UI libraries together to prevent context/singleton issues
+                        // Group React, Ant Design, and ALL their low-level dependencies (rc-*, etc.)
+                        // into a single 'vendor-core' chunk to avoid circular dependencies and context issues.
                         if (
                             id.includes('react') ||
-                            id.includes('react-dom') ||
-                            id.includes('react-router-dom') ||
                             id.includes('antd') ||
                             id.includes('@ant-design') ||
+                            id.includes('rc-') ||
+                            id.includes('scroll-into-view-if-needed') ||
+                            id.includes('compute-scroll-into-view') ||
+                            id.includes('copy-to-clipboard') ||
                             id.includes('framer-motion') ||
-                            id.includes('@tanstack/react-query')
+                            id.includes('@tanstack/react-query') ||
+                            id.includes('scheduler')
                         ) {
-                            return 'vendor-ui-core';
+                            return 'vendor-core';
                         }
 
-                        if (id.includes('recharts')) {
-                            return 'vendor-charts';
-                        }
-                        if (id.includes('supabase')) {
+                        // Backend and utilities
+                        if (id.includes('@supabase') || id.includes('axios') || id.includes('lodash') || id.includes('dayjs') || id.includes('qs')) {
                             return 'vendor-backend';
                         }
+
+                        // Group charts and large visualization libs
+                        if (id.includes('recharts') || id.includes('apexcharts') || id.includes('react-apexcharts') || id.includes('d3-')) {
+                            return 'vendor-charts';
+                        }
+
+                        // Remaining dependencies go to default vendor chunk
                         return 'vendor';
                     }
                 }
