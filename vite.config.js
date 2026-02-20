@@ -36,12 +36,19 @@ export default defineConfig({
             output: {
                 manualChunks(id) {
                     if (id.includes('node_modules')) {
-                        if (id.includes('react') || id.includes('framer-motion')) {
-                            return 'vendor-core';
+                        // Group React and core UI libraries together to prevent context/singleton issues
+                        if (
+                            id.includes('react') ||
+                            id.includes('react-dom') ||
+                            id.includes('react-router-dom') ||
+                            id.includes('antd') ||
+                            id.includes('@ant-design') ||
+                            id.includes('framer-motion') ||
+                            id.includes('@tanstack/react-query')
+                        ) {
+                            return 'vendor-ui-core';
                         }
-                        if (id.includes('antd') || id.includes('@ant-design')) {
-                            return 'vendor-ui';
-                        }
+
                         if (id.includes('recharts')) {
                             return 'vendor-charts';
                         }
