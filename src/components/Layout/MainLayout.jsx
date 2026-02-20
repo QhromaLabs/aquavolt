@@ -16,7 +16,8 @@ import {
     RiseOutlined,
     GlobalOutlined,
     BankOutlined,
-    AndroidOutlined
+    AndroidOutlined,
+    NotificationOutlined
 } from '@ant-design/icons';
 
 
@@ -77,6 +78,7 @@ const MainLayout = ({ children }) => {
                 { key: '/admin/finance', icon: <RiseOutlined />, label: 'Finance' },
                 { key: '/admin/withdrawals', icon: <BankOutlined />, label: 'Withdrawals' },
                 { key: '/admin/futurise-sync', icon: <ApiOutlined />, label: 'Futurise Sync' },
+                { key: '/admin/inquiries', icon: <NotificationOutlined />, label: 'Inquiries' },
                 { key: '/admin/app-update', icon: <AndroidOutlined />, label: 'App Update' },
 
                 { key: '/admin/settings', icon: <SettingOutlined />, label: 'Settings' },

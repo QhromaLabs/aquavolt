@@ -24,13 +24,62 @@ import { supabase } from '../../lib/supabase';
 
 // Lazy load heavy sections
 const FeaturesSection = lazy(() => import('../../components/landing/FeaturesSection'));
-const MarketplaceSection = lazy(() => import('../../components/landing/MarketplaceSection'));
+import MarketplaceSection from '../../components/landing/MarketplaceSection';
 const DownloadSection = lazy(() => import('../../components/landing/DownloadSection'));
+import PublicHeader from '../../components/landing/PublicHeader';
+import PublicFooter from '../../components/landing/PublicFooter';
 
 // Section Placeholder (Loading state)
 const SectionPlaceholder = () => (
     <div className="py-24 animate-pulse bg-slate-900/10" />
 );
+
+const LightningEffect = () => {
+    const [bolts, setBolts] = useState([]);
+
+    useEffect(() => {
+        const interval = setInterval(() => {
+            if (Math.random() > 0.7) {
+                const id = Math.random();
+                const newBolt = {
+                    id,
+                    left: Math.random() * 100 + '%',
+                    top: Math.random() * 50 + '%',
+                    scale: 0.5 + Math.random(),
+                    rotate: Math.random() * 360
+                };
+                setBolts(prev => [...prev.slice(-3), newBolt]);
+                setTimeout(() => {
+                    setBolts(prev => prev.filter(b => b.id !== id));
+                }, 150);
+            }
+        }, 1000);
+        return () => clearInterval(interval);
+    }, []);
+
+    return (
+        <div className="absolute inset-0 z-0 pointer-events-none overflow-hidden">
+            <AnimatePresence>
+                {bolts.map(bolt => (
+                    <motion.div
+                        key={bolt.id}
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: [0, 1, 0] }}
+                        exit={{ opacity: 0 }}
+                        className="absolute"
+                        style={{
+                            left: bolt.left,
+                            top: bolt.top,
+                            transform: `rotate(${bolt.rotate}deg) scale(${bolt.scale})`
+                        }}
+                    >
+                        <Zap className="text-blue-400 w-12 h-12 blur-[2px]" fill="currentColor" />
+                    </motion.div>
+                ))}
+            </AnimatePresence>
+        </div>
+    );
+};
 
 const LandingPage1 = () => {
     const navigate = useNavigate();
@@ -126,147 +175,10 @@ const LandingPage1 = () => {
                 <div className="absolute top-0 left-1/4 w-96 h-96 bg-blue-600/10 rounded-full blur-3xl opacity-50" />
                 <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-emerald-500/10 rounded-full blur-3xl opacity-50" />
                 <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-indigo-900/10 rounded-full blur-3xl" />
+                <LightningEffect />
             </div>
 
-            {/* Navigation */}
-            <motion.nav
-                className="fixed top-0 left-0 right-0 z-50 backdrop-blur-lg border-b border-white/10"
-                initial={{ y: -100 }}
-                animate={{ y: 0 }}
-                transition={{ duration: 0.5 }}
-            >
-                <div className="max-w-7xl mx-auto px-6 lg:px-8">
-                    <div className="flex items-center justify-between h-20">
-                        <div className="flex-shrink-0 cursor-pointer" onClick={() => navigate('/')}>
-                            <img src="/logowhite.png" alt="AquaVolt" className="h-10 w-auto" />
-                        </div>
-
-                        {/* Desktop Menu */}
-                        <div className="hidden md:block">
-                            <div className="ml-10 flex items-baseline space-x-8">
-                                {['Features', 'Solutions', 'About', 'Contact'].map((item) => (
-                                    <a key={item} href={`#${item.toLowerCase()}`} className="text-sm font-medium text-gray-300 hover:text-white transition-colors duration-300">
-                                        {item}
-                                    </a>
-                                ))}
-                            </div>
-                        </div>
-
-                        <div className="hidden md:block">
-                            <button
-                                onClick={() => navigate('/login')}
-                                className="bg-blue-600 hover:bg-blue-500 text-white px-6 py-2 rounded-full font-medium transition-all duration-300 shadow-lg shadow-blue-500/25 hover:shadow-blue-500/40"
-                            >
-                                Sign In
-                            </button>
-                        </div>
-
-                        {/* Mobile menu button */}
-                        <div className="md:hidden">
-                            <button
-                                onClick={() => setIsMenuOpen(true)}
-                                className="text-[#1ECF49] hover:text-[#1ECF49]/80 transition-colors"
-                                style={{
-                                    background: 'none',
-                                    backgroundColor: 'transparent',
-                                    border: 'none',
-                                    outline: 'none',
-                                    padding: 0,
-                                    margin: 0,
-                                    boxShadow: 'none',
-                                    WebkitAppearance: 'none',
-                                    MozAppearance: 'none',
-                                    appearance: 'none'
-                                }}
-                            >
-                                <Menu size={32} />
-                            </button>
-                        </div>
-                    </div>
-                </div>
-
-                {/* Full Screen Mobile Menu */}
-                <AnimatePresence>
-                    {isMenuOpen && (
-                        <motion.div
-                            initial="closed"
-                            animate="open"
-                            exit="closed"
-                            variants={menuVariants}
-                            className="fixed inset-0 z-[60] flex flex-col md:hidden"
-                            style={{
-                                backgroundColor: '#1e3a8a',
-                                opacity: 1
-                            }}
-                        >
-                            {/* Header */}
-                            <div className="flex items-center justify-between px-6 h-20 border-b border-white/10" style={{ backgroundColor: '#1e3a8a', opacity: 1 }}>
-                                <img src="/logowhite.png" alt="AquaVolt" className="h-8 w-auto" />
-                                <button
-                                    onClick={() => setIsMenuOpen(false)}
-                                    className="p-2 bg-white/5 rounded-full hover:bg-white/10 transition-colors"
-                                >
-                                    <X size={24} className="text-white" />
-                                </button>
-                            </div>
-
-                            {/* Menu Items */}
-                            <div className="flex-1 flex flex-col justify-center items-center space-y-8 px-6">
-                                {['Features', 'Solutions', 'About', 'Contact'].map((item) => (
-                                    <motion.a
-                                        key={item}
-                                        href={`#${item.toLowerCase()}`}
-                                        onClick={() => setIsMenuOpen(false)}
-                                        className="text-3xl font-bold text-white hover:text-[#1ECF49] transition-colors"
-                                        whileHover={{ scale: 1.1 }}
-                                        whileTap={{ scale: 0.95 }}
-                                    >
-                                        {item}
-                                    </motion.a>
-                                ))}
-                                <button
-                                    onClick={() => {
-                                        navigate('/login');
-                                        setIsMenuOpen(false);
-                                    }}
-                                    className="mt-8 bg-blue-600 text-white px-10 py-4 rounded-full text-lg font-semibold w-full max-w-xs shadow-lg shadow-blue-600/30"
-                                >
-                                    Sign In
-                                </button>
-                            </div>
-
-                            {/* Footer / Contact Info */}
-                            <div className="p-8 pb-12 bg-black/20 pb-safe">
-                                <div className="flex flex-col items-center space-y-4 text-center">
-                                    <img src="/logowhite.png" alt="AquaVolt" className="h-8 opacity-70 mb-2" />
-
-                                    <div className="flex items-center justify-center space-x-6 w-full">
-                                        {contactInfo.phone && (
-                                            <a href={`tel:${contactInfo.phone}`} className="flex flex-col items-center gap-2 text-slate-400 hover:text-[#1ECF49] transition-colors">
-                                                <div className="p-3 bg-white/5 rounded-full">
-                                                    <Phone size={20} />
-                                                </div>
-                                                <span className="text-xs">Call Us</span>
-                                            </a>
-                                        )}
-
-                                        <a href={`mailto:${contactInfo.email}`} className="flex flex-col items-center gap-2 text-slate-400 hover:text-[#1ECF49] transition-colors">
-                                            <div className="p-3 bg-white/5 rounded-full">
-                                                <Mail size={20} />
-                                            </div>
-                                            <span className="text-xs">Email</span>
-                                        </a>
-                                    </div>
-
-                                    <div className="pt-4 text-xs text-slate-600 border-t border-white/5 w-full text-center mt-2">
-                                        © 2026 AquaVolt Platform
-                                    </div>
-                                </div>
-                            </div>
-                        </motion.div>
-                    )}
-                </AnimatePresence>
-            </motion.nav>
+            <PublicHeader contactInfo={contactInfo} />
 
             {/* Hero Section */}
             <section className="relative z-10 pt-32 pb-20 lg:pt-48 lg:pb-32 px-6">
@@ -298,8 +210,9 @@ const LandingPage1 = () => {
                             }} className="w-full sm:w-auto px-8 py-4 bg-white text-slate-900 rounded-full font-semibold hover:bg-gray-100 transition-all duration-300 flex items-center justify-center group shadow-[0_0_40px_-10px_rgba(255,255,255,0.3)]">
                                 Get Started Now <ArrowRight size={20} className="ml-2 group-hover:translate-x-1 transition-transform" />
                             </button>
-                            <button onClick={() => setShowDemoModal(true)} className="w-full sm:w-auto px-8 py-4 bg-white/5 text-white border border-white/10 rounded-full font-semibold hover:bg-white/10 transition-all duration-300 backdrop-blur-sm">
-                                View Demo
+
+                            <button onClick={() => navigate('/apps')} className="w-full sm:w-auto px-8 py-4 bg-transparent text-white border border-white/20 rounded-full font-semibold hover:bg-white/5 transition-all duration-300 flex items-center justify-center group no-underline">
+                                Download Tenant App <Download size={20} className="ml-2 group-hover:translate-y-1 transition-transform" />
                             </button>
                         </motion.div>
                     </motion.div>
@@ -343,9 +256,7 @@ const LandingPage1 = () => {
             </Suspense>
 
             {/* Marketplace Section */}
-            <Suspense fallback={<SectionPlaceholder />}>
-                <MarketplaceSection />
-            </Suspense>
+            <MarketplaceSection />
 
             {/* App Download Section */}
             <Suspense fallback={<SectionPlaceholder />}>
@@ -353,138 +264,7 @@ const LandingPage1 = () => {
             </Suspense>
 
 
-            {/* Footer */}
-            <footer className="relative z-10 bg-gradient-to-b from-[#0F172A] to-[#020617] border-t border-white/5 overflow-hidden">
-                {/* Gradient Orb Background */}
-                <div className="absolute top-0 left-1/4 w-96 h-96 bg-blue-500/5 rounded-full blur-3xl" />
-                <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-emerald-500/5 rounded-full blur-3xl" />
-
-                <div className="relative max-w-7xl mx-auto px-6 py-16">
-                    {/* Main Footer Content */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-12 mb-12">
-                        {/* Brand Column */}
-                        <div className="space-y-4">
-                            <img src="/logowhite.png" alt="AquaVolt" className="h-10 w-auto" />
-                            <p className="text-slate-400 text-sm leading-relaxed">
-                                Next-generation property utility management. Automated readings, instant payments, and real-time analytics.
-                            </p>
-                            <div className="flex gap-3">
-                                <a href="#" className="w-10 h-10 rounded-full bg-white/5 border border-white/10 flex items-center justify-center hover:bg-[#1ECF49] hover:border-[#1ECF49] transition-all group">
-                                    <Globe className="w-4 h-4 text-slate-400 group-hover:text-white" />
-                                </a>
-                                <a href="https://wa.me/254115146212" target="_blank" rel="noreferrer" className="w-10 h-10 rounded-full bg-white/5 border border-white/10 flex items-center justify-center hover:bg-[#1ECF49] hover:border-[#1ECF49] transition-all group">
-                                    <Phone className="w-4 h-4 text-slate-400 group-hover:text-white" />
-                                </a>
-                                <a href={`mailto:${contactInfo.email}`} className="w-10 h-10 rounded-full bg-white/5 border border-white/10 flex items-center justify-center hover:bg-[#1ECF49] hover:border-[#1ECF49] transition-all group">
-                                    <Mail className="w-4 h-4 text-slate-400 group-hover:text-white" />
-                                </a>
-                            </div>
-                        </div>
-
-                        {/* Product Column */}
-                        <div className="space-y-4">
-                            <h3 className="text-white font-semibold text-sm uppercase tracking-wider">Product</h3>
-                            <ul className="space-y-3">
-                                <li><a href="#features" className="text-slate-400 hover:text-[#1ECF49] transition-colors text-sm flex items-center gap-2 group">
-                                    <ArrowRight className="w-3 h-3 opacity-0 group-hover:opacity-100 transition-opacity" />
-                                    Features
-                                </a></li>
-                                <li><a href="#download" className="text-slate-400 hover:text-[#1ECF49] transition-colors text-sm flex items-center gap-2 group">
-                                    <ArrowRight className="w-3 h-3 opacity-0 group-hover:opacity-100 transition-opacity" />
-                                    Mobile Apps
-                                </a></li>
-                                <li><a href="#" className="text-slate-400 hover:text-[#1ECF49] transition-colors text-sm flex items-center gap-2 group">
-                                    <ArrowRight className="w-3 h-3 opacity-0 group-hover:opacity-100 transition-opacity" />
-                                    Pricing
-                                </a></li>
-                                <li><a href="#" className="text-slate-400 hover:text-[#1ECF49] transition-colors text-sm flex items-center gap-2 group">
-                                    <ArrowRight className="w-3 h-3 opacity-0 group-hover:opacity-100 transition-opacity" />
-                                    Updates
-                                </a></li>
-                            </ul>
-                        </div>
-
-                        {/* Company Column */}
-                        <div className="space-y-4">
-                            <h3 className="text-white font-semibold text-sm uppercase tracking-wider">Company</h3>
-                            <ul className="space-y-3">
-                                <li><a href="#" className="text-slate-400 hover:text-[#1ECF49] transition-colors text-sm flex items-center gap-2 group">
-                                    <ArrowRight className="w-3 h-3 opacity-0 group-hover:opacity-100 transition-opacity" />
-                                    About Us
-                                </a></li>
-                                <li><a href="#" className="text-slate-400 hover:text-[#1ECF49] transition-colors text-sm flex items-center gap-2 group">
-                                    <ArrowRight className="w-3 h-3 opacity-0 group-hover:opacity-100 transition-opacity" />
-                                    Careers
-                                </a></li>
-                                <li><a href="#" className="text-slate-400 hover:text-[#1ECF49] transition-colors text-sm flex items-center gap-2 group">
-                                    <ArrowRight className="w-3 h-3 opacity-0 group-hover:opacity-100 transition-opacity" />
-                                    Contact
-                                </a></li>
-                                <li><a href="#" className="text-slate-400 hover:text-[#1ECF49] transition-colors text-sm flex items-center gap-2 group">
-                                    <ArrowRight className="w-3 h-3 opacity-0 group-hover:opacity-100 transition-opacity" />
-                                    Blog
-                                </a></li>
-                            </ul>
-                        </div>
-
-                        {/* Support Column */}
-                        <div className="space-y-4">
-                            <h3 className="text-white font-semibold text-sm uppercase tracking-wider">Support</h3>
-                            <ul className="space-y-3">
-                                <li><a href="#" className="text-slate-400 hover:text-[#1ECF49] transition-colors text-sm flex items-center gap-2 group">
-                                    <ArrowRight className="w-3 h-3 opacity-0 group-hover:opacity-100 transition-opacity" />
-                                    Help Center
-                                </a></li>
-                                <li><a href="#" className="text-slate-400 hover:text-[#1ECF49] transition-colors text-sm flex items-center gap-2 group">
-                                    <ArrowRight className="w-3 h-3 opacity-0 group-hover:opacity-100 transition-opacity" />
-                                    Privacy Policy
-                                </a></li>
-                                <li><a href="#" className="text-slate-400 hover:text-[#1ECF49] transition-colors text-sm flex items-center gap-2 group">
-                                    <ArrowRight className="w-3 h-3 opacity-0 group-hover:opacity-100 transition-opacity" />
-                                    Terms of Service
-                                </a></li>
-                                <li><a href="https://wa.me/254115146212" target="_blank" rel="noreferrer" className="text-slate-400 hover:text-[#1ECF49] transition-colors text-sm flex items-center gap-2 group">
-                                    <ArrowRight className="w-3 h-3 opacity-0 group-hover:opacity-100 transition-opacity" />
-                                    WhatsApp Support
-                                </a></li>
-                            </ul>
-                        </div>
-                    </div>
-
-                    {/* Bottom Bar */}
-                    <div className="pt-8 border-t border-white/5">
-                        <div className="flex flex-col md:flex-row justify-between items-center gap-4">
-                            {/* Copyright & Developer Credit */}
-                            <div className="flex flex-col md:flex-row items-center gap-2 md:gap-4 text-sm text-slate-500">
-                                <span>© 2026 AquaVolt Platform. All rights reserved.</span>
-                                <span className="hidden md:block text-slate-700">•</span>
-                                <div className="flex items-center gap-2">
-                                    <span>Built by</span>
-                                    <span className="text-[#1ECF49] font-semibold">Qhroma Labs</span>
-                                    <span className="text-slate-700">•</span>
-                                    <span>Nairobi, Kenya</span>
-                                </div>
-                            </div>
-
-                            {/* Trust Badges */}
-                            <div className="flex items-center gap-4 text-xs text-slate-500">
-                                <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white/5 border border-white/10">
-                                    <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
-                                    <span>Secure</span>
-                                </div>
-                                <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white/5 border border-white/10">
-                                    <Zap className="w-3.5 h-3.5 text-yellow-400" />
-                                    <span>Fast</span>
-                                </div>
-                                <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white/5 border border-white/10">
-                                    <CheckCircle2 className="w-3.5 h-3.5 text-blue-400" />
-                                    <span>Trusted</span>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </footer>
+            <PublicFooter contactInfo={contactInfo} />
 
             {/* Getting Started Demo Modal */}
             <AnimatePresence>

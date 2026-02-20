@@ -10,7 +10,12 @@ import TenantLogin from './pages/auth/TenantLogin';
 import SignUp from './pages/auth/SignUp';
 import Unauthorized from './pages/auth/Unauthorized';
 import LandingPage1 from './pages/public/LandingPage1';
+import AppDownload from './pages/public/AppDownload';
 import DemoLandlordDashboard from './pages/public/DemoLandlordDashboard';
+import PrivacyPolicy from './pages/public/PrivacyPolicy';
+import TermsOfService from './pages/public/TermsOfService';
+import AboutUs from './pages/public/AboutUs';
+import HelpCenter from './pages/public/HelpCenter';
 
 // Admin pages - lazy load
 const AdminDashboard = lazy(() => import('./pages/admin/Dashboard'));
@@ -24,6 +29,7 @@ const AdminFinance = lazy(() => import('./pages/admin/Finance'));
 const WithdrawalRequests = lazy(() => import('./pages/admin/WithdrawalRequests'));
 const Settings = lazy(() => import('./pages/admin/Settings'));
 const FuturiseSync = lazy(() => import('./pages/admin/FuturiseSync'));
+const Inquiries = lazy(() => import('./pages/admin/Inquiries'));
 const AppUpdate = lazy(() => import('./pages/admin/AppUpdate'));
 
 // Landlord pages - lazy load
@@ -60,7 +66,13 @@ function App() {
                         <Route path="/portal" element={<TenantLogin />} />
                         <Route path="/signup" element={<SignUp />} />
                         <Route path="/landing-page-1" element={<LandingPage1 />} />
+                        <Route path="/download-apps" element={<AppDownload />} />
+                        <Route path="/apps" element={<AppDownload />} />
                         <Route path="/demo/landlord" element={<DemoLandlordDashboard />} />
+                        <Route path="/privacy" element={<PrivacyPolicy />} />
+                        <Route path="/terms" element={<TermsOfService />} />
+                        <Route path="/about" element={<AboutUs />} />
+                        <Route path="/help" element={<HelpCenter />} />
 
                         {/* Tenant Setup Route (potentially public or with minimal guard) */}
                         <Route path="/tenant/setup" element={
@@ -87,6 +99,7 @@ function App() {
                                         <Route path="finance" element={<AdminFinance />} />
                                         <Route path="withdrawals" element={<WithdrawalRequests />} />
                                         <Route path="futurise-sync" element={<FuturiseSync />} />
+                                        <Route path="inquiries" element={<Inquiries />} />
                                         <Route path="app-update" element={<AppUpdate />} />
 
                                         <Route path="settings" element={<Settings />} />
