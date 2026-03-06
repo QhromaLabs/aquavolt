@@ -72,10 +72,21 @@ const UserManagement = () => {
     const fetchUsers = async () => {
         setLoading(true);
         try {
-            // Fetch profiles
+            // Fetch profiles with their active unit assignments
             const { data, error } = await supabase
                 .from('profiles')
-                .select('*')
+                .select(`
+                    *,
+                    unit_assignments (
+                        status,
+                        units (
+                            label,
+                            properties (
+                                name
+                            )
+                        )
+                    )
+                `)
                 .order('created_at', { ascending: false });
 
             if (error) throw error;
@@ -417,6 +428,28 @@ const UserManagement = () => {
                 { text: 'Tenant', value: 'tenant' },
             ],
             onFilter: (value, record) => record.role === value,
+        },
+        {
+            title: 'Unit',
+            key: 'unit',
+            render: (_, record) => {
+                if (record.role === 'tenant') {
+                    const activeAssignment = record.unit_assignments?.find(ua => ua.status === 'active');
+                    if (activeAssignment && activeAssignment.units) {
+                        return (
+                            <div>
+                                <Text strong>{activeAssignment.units.label}</Text>
+                                <br />
+                                <Text type="secondary" style={{ fontSize: '11px' }}>
+                                    {activeAssignment.units.properties?.name}
+                                </Text>
+                            </div>
+                        );
+                    }
+                    return <Text type="secondary">Not Assigned</Text>;
+                }
+                return <Text type="secondary">-</Text>;
+            }
         },
         {
             title: 'Phone',
