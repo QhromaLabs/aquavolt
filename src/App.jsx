@@ -16,6 +16,7 @@ import PrivacyPolicy from './pages/public/PrivacyPolicy';
 import TermsOfService from './pages/public/TermsOfService';
 import AboutUs from './pages/public/AboutUs';
 import HelpCenter from './pages/public/HelpCenter';
+import Changelog from './pages/public/Changelog';
 
 // Admin pages - lazy load
 const AdminDashboard = lazy(() => import('./pages/admin/Dashboard'));
@@ -73,6 +74,7 @@ function App() {
                         <Route path="/terms" element={<TermsOfService />} />
                         <Route path="/about" element={<AboutUs />} />
                         <Route path="/help" element={<HelpCenter />} />
+                        <Route path="/changelog" element={<Changelog />} />
 
                         {/* Tenant Setup Route (potentially public or with minimal guard) */}
                         <Route path="/tenant/setup" element={
