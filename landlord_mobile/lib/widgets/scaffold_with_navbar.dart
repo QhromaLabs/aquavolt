@@ -58,9 +58,9 @@ class ScaffoldWithNavBar extends StatelessWidget {
               label: 'Home',
             ),
             NavigationDestination(
-              icon: const Icon(PhosphorIconsRegular.buildings, color: Colors.black54),
-              selectedIcon: _glowingIcon(PhosphorIconsFill.buildings),
-              label: 'Properties',
+              icon: const Icon(PhosphorIconsRegular.users, color: Colors.black54),
+              selectedIcon: _glowingIcon(PhosphorIconsFill.users),
+              label: 'Tenants Hub',
             ),
             NavigationDestination(
               icon: const Icon(PhosphorIconsRegular.lightning, color: Colors.black54),

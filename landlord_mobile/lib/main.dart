@@ -23,7 +23,8 @@ import 'screens/caretaker_dashboard_screen.dart';
 import 'screens/caretaker_meters_screen.dart';
 import 'screens/caretaker_tenants_screen.dart';
 import 'screens/caretaker_profile_screen.dart';
-
+import 'widgets/tutorial_overlay.dart';
+import 'providers/tutorial_provider.dart';
 import 'constants.dart';
 
 Future<void> main() async {
@@ -41,6 +42,7 @@ Future<void> main() async {
       providers: [
         ChangeNotifierProvider.value(value: authProvider),
         ChangeNotifierProvider(create: (_) => LandlordProvider()),
+        ChangeNotifierProvider(create: (_) => TutorialProvider()),
       ],
       child: LandlordApp(authProvider: authProvider),
     ),
@@ -75,10 +77,6 @@ class LandlordApp extends StatelessWidget {
           path: '/wallet',
           builder: (context, state) => const WalletScreen(),
         ),
-        GoRoute(
-          path: '/tenants',
-          builder: (context, state) => const TenantsScreen(),
-        ),
          GoRoute(
           path: '/reports',
           builder: (context, state) => const ReportsScreen(),
@@ -99,8 +97,8 @@ class LandlordApp extends StatelessWidget {
             StatefulShellBranch(
               routes: [
                 GoRoute(
-                  path: '/properties',
-                  builder: (context, state) => const PropertiesScreen(),
+                  path: '/tenants',
+                  builder: (context, state) => const TenantsScreen(),
                 ),
               ],
             ),
@@ -218,6 +216,9 @@ class LandlordApp extends StatelessWidget {
         scaffoldBackgroundColor: const Color(0xFFF8F9FA),
       ),
       routerConfig: _router,
+      builder: (context, child) {
+        return TutorialOverlay(child: child!);
+      },
     );
   }
 }

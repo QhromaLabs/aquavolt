@@ -11,7 +11,8 @@ class WalletScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final landlord = context.watch<LandlordProvider>();
-    final revenue = landlord.totalRevenue;
+    final balance = landlord.availableBalance;
+    final totalEarnings = landlord.lifetimeRevenue;
     
     // Check for pending withdrawals
     final pendingWithdrawal = landlord.withdrawalRequests
@@ -61,23 +62,35 @@ class WalletScreen extends StatelessWidget {
                   ),
                   Column(
                     children: [
-                       const Text(
+                      const Text(
                         'Available Balance',
                         style: TextStyle(color: Colors.white70, fontSize: 14),
                       ),
                       const SizedBox(height: 8),
                       Text(
-                        'KSh ${revenue.toStringAsFixed(2)}',
+                        'KSh ${NumberFormat('#,###.00').format(balance)}',
                         style: const TextStyle(
                           color: Colors.white,
                           fontSize: 36,
                           fontWeight: FontWeight.bold,
                         ),
                       ),
+                      const SizedBox(height: 12),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withValues(alpha: 0.2),
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: Text(
+                          'Total Earnings: KSh ${NumberFormat('#,###').format(totalEarnings)}',
+                          style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w500),
+                        ),
+                      ),
                       const SizedBox(height: 24),
                       ElevatedButton.icon(
                         onPressed: () {
-                          _showWithdrawBottomSheet(context, revenue);
+                          _showWithdrawBottomSheet(context, balance);
                         },
                         icon: const Icon(PhosphorIconsBold.bank),
                         label: const Text('Withdraw Funds'),
@@ -150,29 +163,91 @@ class WalletScreen extends StatelessWidget {
                     borderRadius: BorderRadius.circular(12),
                     boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.03), blurRadius: 5)],
                   ),
-                  child: ListTile(
-                    leading: Container(
-                      padding: const EdgeInsets.all(10),
-                      decoration: BoxDecoration(
-                        color: bgColor,
-                        shape: BoxShape.circle,
-                      ),
-                      child: Icon(icon, color: color, size: 20),
-                    ),
-                    title: Text(title, style: const TextStyle(fontWeight: FontWeight.w600)),
-                    subtitle: Text(subtitle, style: const TextStyle(fontSize: 12, color: Colors.grey)),
-                    trailing: Text(
-                      '${isCredit ? '+' : '-'} KSh ${amount.toStringAsFixed(2)}',
-                      style: TextStyle(
-                        fontWeight: FontWeight.bold, 
-                        color: (isCredit) ? const Color(0xFF52C41A) : (status == 'rejected' ? Colors.grey : Colors.black87),
-                        decoration: status == 'rejected' ? TextDecoration.lineThrough : null,
-                        fontSize: 16
+                  child: Material(
+                    color: Colors.transparent,
+                    child: InkWell(
+                      borderRadius: BorderRadius.circular(12),
+                      onTap: () => _showTransactionDetails(context, t),
+                      child: ListTile(
+                        leading: Container(
+                          padding: const EdgeInsets.all(10),
+                          decoration: BoxDecoration(
+                            color: bgColor,
+                            shape: BoxShape.circle,
+                          ),
+                          child: Icon(icon, color: color, size: 20),
+                        ),
+                        title: Text(title, style: const TextStyle(fontWeight: FontWeight.w600)),
+                        subtitle: Text(subtitle, style: const TextStyle(fontSize: 12, color: Colors.grey)),
+                        trailing: Text(
+                          '${isCredit ? '+' : '-'} KSh ${amount.toStringAsFixed(2)}',
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold, 
+                            color: (isCredit) ? const Color(0xFF52C41A) : (status == 'rejected' ? Colors.grey : Colors.black87),
+                            decoration: status == 'rejected' ? TextDecoration.lineThrough : null,
+                            fontSize: 16
+                          ),
+                        ),
                       ),
                     ),
                   ),
                 );
               }),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showTransactionDetails(BuildContext context, Map<String, dynamic> tx) {
+    final isCredit = tx['type'] == 'credit';
+    final date = tx['date'] as DateTime;
+    final formattedDate = DateFormat('MMMM d, yyyy • h:mm a').format(date);
+    
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+      builder: (ctx) => Padding(
+        padding: const EdgeInsets.all(24.0),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  isCredit ? 'Credit Transaction' : 'Withdrawal Request',
+                  style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                ),
+                IconButton(
+                  onPressed: () => Navigator.pop(ctx),
+                  icon: const Icon(PhosphorIconsRegular.x),
+                ),
+              ],
+            ),
+            const Divider(height: 32),
+            _DetailRow(label: 'Amount', value: 'KSh ${NumberFormat('#,###.00').format(tx['amount'])}', isValueBold: true),
+            const SizedBox(height: 16),
+            _DetailRow(label: 'Date & Time', value: formattedDate),
+            const SizedBox(height: 16),
+            _DetailRow(label: 'Status', value: tx['status'].toString().toUpperCase(), isStatus: true),
+            const SizedBox(height: 16),
+            _DetailRow(label: 'Description', value: tx['description'] ?? 'N/A'),
+            const SizedBox(height: 16),
+            _DetailRow(label: 'Transaction ID', value: tx['id'].toString(), isSmall: true),
+            const SizedBox(height: 32),
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton(
+                onPressed: () => Navigator.pop(ctx),
+                style: OutlinedButton.styleFrom(
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                ),
+                child: const Text('Close'),
+              ),
+            ),
           ],
         ),
       ),
@@ -185,6 +260,47 @@ class WalletScreen extends StatelessWidget {
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (ctx) => _WithdrawBottomSheet(maxAmount: maxAmount),
+    );
+  }
+}
+
+class _DetailRow extends StatelessWidget {
+  final String label;
+  final String value;
+  final bool isValueBold;
+  final bool isStatus;
+  final bool isSmall;
+
+  const _DetailRow({
+    required this.label,
+    required this.value,
+    this.isValueBold = false,
+    this.isStatus = false,
+    this.isSmall = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    Color valueColor = isStatus 
+        ? (value == 'COMPLETED' || value == 'APPROVED' || value == 'SUCCESS' ? const Color(0xFF52C41A) : (value == 'REJECTED' ? const Color(0xFFF5222D) : const Color(0xFFFA8C16)))
+        : Colors.black87;
+
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Text(label, style: const TextStyle(color: Colors.grey, fontSize: 14)),
+        Flexible(
+          child: Text(
+            value,
+            textAlign: TextAlign.right,
+            style: TextStyle(
+              fontWeight: isValueBold || isStatus ? FontWeight.bold : FontWeight.normal,
+              fontSize: isSmall ? 12 : 14,
+              color: valueColor,
+            ),
+          ),
+        ),
+      ],
     );
   }
 }

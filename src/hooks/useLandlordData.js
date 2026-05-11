@@ -9,11 +9,14 @@ export const useLandlordData = () => {
     const [tenants, setTenants] = useState([]);
     const [meters, setMeters] = useState([]);
     const [transactions, setTransactions] = useState([]);
+    const [withdrawals, setWithdrawals] = useState([]);
     const [chartData, setChartData] = useState([]);
     const [stats, setStats] = useState({
         totalRevenue: 0,
         monthlyRevenue: 0,
         todayRevenue: 0,
+        accountBalance: 0,
+        totalWithdrawn: 0,
         propertyCount: 0,
         tenantCount: 0,
         meterCount: 0,
@@ -161,8 +164,23 @@ export const useLandlordData = () => {
                 });
             }
 
-            // 5. Calculate stats
+            // 4.5 Fetch withdrawal requests
+            const { data: withdrawData, error: withdrawError } = await supabase
+                .from('withdrawal_requests')
+                .select('*')
+                .eq('landlord_id', user.id);
+
+            if (withdrawError) console.error('Error fetching withdrawals:', withdrawError);
+            const allWithdrawals = withdrawData || [];
+            setWithdrawals(allWithdrawals);
+
+            // 6. Calculate stats
             const totalRev = allTopups.reduce((acc, t) => acc + (parseFloat(t.amount_paid) || 0), 0);
+            const totalWithdrawn = allWithdrawals
+                .filter(w => w.status === 'approved' || w.status === 'completed')
+                .reduce((acc, w) => acc + (parseFloat(w.amount) || 0), 0);
+            
+            const accountBalance = totalRev - totalWithdrawn;
 
             const now = new Date();
             const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
@@ -189,7 +207,7 @@ export const useLandlordData = () => {
                 ? ((recentRevenue - previousRevenue) / previousRevenue * 100).toFixed(1)
                 : 0;
 
-            // 6. Prepare chart data (last 30 days)
+            // 7. Prepare chart data (last 30 days)
             const last30Days = [];
             for (let i = 29; i >= 0; i--) {
                 const date = new Date();
@@ -207,20 +225,44 @@ export const useLandlordData = () => {
             }
             setChartData(last30Days);
 
-            // 7. Attach derived units to properties
+            // 8. Calculate financials per unit
+            const unitFinancials = {};
+            allTopups.forEach(t => {
+                if (!unitFinancials[t.unit_id]) {
+                    unitFinancials[t.unit_id] = {
+                        revenue: 0,
+                        units: 0,
+                        topupCount: 0
+                    };
+                }
+                unitFinancials[t.unit_id].revenue += parseFloat(t.amount_paid) || 0;
+                unitFinancials[t.unit_id].units += parseFloat(t.amount_vended) || 0;
+                unitFinancials[t.unit_id].topupCount += 1;
+            });
+
+            // 9. Attach derived units to properties and add financial data
+            const enrichedUnits = unitsWithDerivedStatus.map(u => ({
+                ...u,
+                totalRevenue: unitFinancials[u.id]?.revenue || 0,
+                totalUnits: unitFinancials[u.id]?.units || 0,
+                topupCount: unitFinancials[u.id]?.topupCount || 0,
+            }));
+
             const propertiesWithUnits = props.map(p => ({
                 ...p,
-                units: unitsWithDerivedStatus.filter(u => u.property_id === p.id)
+                units: enrichedUnits.filter(u => u.property_id === p.id)
             }));
 
             setProperties(propertiesWithUnits);
-            setMeters(unitsWithDerivedStatus);
+            setMeters(enrichedUnits);
             setTenants(activeTenants);
             setTransactions(allTopups);
             setStats({
                 totalRevenue: totalRev,
                 monthlyRevenue: monthlyRev,
                 todayRevenue: todayRev,
+                accountBalance: accountBalance,
+                totalWithdrawn: totalWithdrawn,
                 propertyCount: props.length,
                 tenantCount: activeTenants.length,
                 meterCount: allUnits.length,
@@ -246,6 +288,7 @@ export const useLandlordData = () => {
         tenants,
         meters,
         transactions,
+        withdrawals,
         chartData,
         stats,
         refreshData

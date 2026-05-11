@@ -15,18 +15,42 @@ class AddTenantScreen extends StatefulWidget {
 class _AddTenantScreenState extends State<AddTenantScreen> {
   final _formKey = GlobalKey<FormState>();
   final _nameController = TextEditingController();
-  final _emailController = TextEditingController();
   final _phoneController = TextEditingController();
+  final _emailController = TextEditingController();
+  final _passwordController = TextEditingController();
   
   String? _selectedPropertyId;
   String? _selectedUnitId;
   bool _isSaving = false;
+  bool _isPasswordVisible = true;
+  final _passwordFocusNode = FocusNode();
+
+  @override
+  void initState() {
+    super.initState();
+    _passwordFocusNode.addListener(() {
+      if (_passwordFocusNode.hasFocus && _passwordController.text.isEmpty) {
+        _generatePassword();
+      }
+    });
+  }
+
+  void _generatePassword() {
+    const chars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#\$%^&*';
+    final random = DateTime.now().microsecondsSinceEpoch;
+    final password = List.generate(10, (index) => chars[(random + index * 7) % chars.length]).join();
+    setState(() {
+      _passwordController.text = password;
+    });
+  }
 
   @override
   void dispose() {
     _nameController.dispose();
-    _emailController.dispose();
     _phoneController.dispose();
+    _emailController.dispose();
+    _passwordController.dispose();
+    _passwordFocusNode.dispose();
     super.dispose();
   }
 
@@ -45,6 +69,7 @@ class _AddTenantScreenState extends State<AddTenantScreen> {
         email: _emailController.text.trim(),
         phoneNumber: _phoneController.text.trim(),
         unitId: _selectedUnitId!,
+        password: _passwordController.text.trim(),
       );
 
       if (mounted) {
@@ -92,7 +117,7 @@ class _AddTenantScreenState extends State<AddTenantScreen> {
                 ),
                 const SizedBox(height: 8),
                 const Text(
-                  'Create an account for the new tenant. They will receive an email to set their permanent password.',
+                  'Create an account for the new tenant. They can login to the tenant app using these credentials.',
                   style: TextStyle(color: Colors.grey),
                 ),
                 const SizedBox(height: 24),
@@ -103,6 +128,17 @@ class _AddTenantScreenState extends State<AddTenantScreen> {
                   decoration: InputDecoration(
                     labelText: 'Full Name',
                     prefixIcon: const Icon(PhosphorIconsRegular.user),
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                ),
+                const SizedBox(height: 16),
+
+                TextFormField(
+                  controller: _phoneController,
+                  keyboardType: TextInputType.phone,
+                  decoration: InputDecoration(
+                    labelText: 'Phone Number',
+                    prefixIcon: const Icon(PhosphorIconsRegular.phone),
                     border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                   ),
                 ),
@@ -119,14 +155,32 @@ class _AddTenantScreenState extends State<AddTenantScreen> {
                   ),
                 ),
                 const SizedBox(height: 16),
-                
+
                 TextFormField(
-                  controller: _phoneController,
-                  keyboardType: TextInputType.phone,
+                  controller: _passwordController,
+                  focusNode: _passwordFocusNode,
+                  obscureText: !_isPasswordVisible,
+                  validator: (value) => value == null || value.length < 6 ? 'Password must be at least 6 characters' : null,
                   decoration: InputDecoration(
-                    labelText: 'Phone Number',
-                    prefixIcon: const Icon(PhosphorIconsRegular.phone),
+                    labelText: 'Password',
+                    prefixIcon: const Icon(PhosphorIconsRegular.lock),
+                    suffixIcon: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        IconButton(
+                          icon: const Icon(PhosphorIconsRegular.arrowsClockwise),
+                          onPressed: _generatePassword,
+                          tooltip: 'Regenerate',
+                        ),
+                        IconButton(
+                          icon: Icon(_isPasswordVisible ? PhosphorIconsRegular.eye : PhosphorIconsRegular.eyeSlash),
+                          onPressed: () => setState(() => _isPasswordVisible = !_isPasswordVisible),
+                          tooltip: 'Toggle Visibility',
+                        ),
+                      ],
+                    ),
                     border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                    helperText: 'Auto-generated for convenience. Tenant can change this later.',
                   ),
                 ),
 

@@ -23,14 +23,36 @@ class LandlordProvider extends ChangeNotifier {
   bool get isLoading => _isLoading;
   String? get error => _error;
 
-  double get totalRevenue {
-    final income = _topups.fold(0.0, (sum, item) => sum + (double.tryParse(item['amount_paid'].toString()) ?? 0.0));
-    final netIncome = income * 0.95; // 5% Commission
-    final withdrawals = _withdrawalRequests
-        .where((r) => ['pending', 'approved', 'completed'].contains(r['status']))
-        .fold(0.0, (sum, item) => sum + (double.tryParse(item['amount'].toString()) ?? 0.0));
-    return netIncome - withdrawals;
+  // Financial Metrics
+  double get lifetimeRevenue => _topups.fold(0.0, (sum, item) => sum + (double.tryParse(item['amount_paid'].toString()) ?? 0.0));
+  
+  double get monthlyRevenue {
+    final now = DateTime.now();
+    final startOfMonth = DateTime(now.year, now.month, 1);
+    return _topups.where((t) {
+      final date = DateTime.parse(t['created_at']);
+      return date.isAfter(startOfMonth);
+    }).fold(0.0, (sum, item) => sum + (double.tryParse(item['amount_paid'].toString()) ?? 0.0));
   }
+
+  double get annualRevenue {
+    final now = DateTime.now();
+    final startOfYear = DateTime(now.year, 1, 1);
+    return _topups.where((t) {
+      final date = DateTime.parse(t['created_at']);
+      return date.isAfter(startOfYear);
+    }).fold(0.0, (sum, item) => sum + (double.tryParse(item['amount_paid'].toString()) ?? 0.0));
+  }
+
+  double get availableBalance {
+    final totalPaid = lifetimeRevenue;
+    final totalWithdrawn = _withdrawalRequests
+        .where((r) => ['approved', 'completed'].contains(r['status']))
+        .fold(0.0, (sum, item) => sum + (double.tryParse(item['amount'].toString()) ?? 0.0));
+    return totalPaid - totalWithdrawn;
+  }
+
+  double get totalUnitsVended => _topups.fold(0.0, (sum, item) => sum + (double.tryParse(item['amount_vended'].toString()) ?? 0.0));
 
   List<Map<String, dynamic>> get allTransactions {
     final List<Map<String, dynamic>> transactions = [];
@@ -205,6 +227,31 @@ class LandlordProvider extends ChangeNotifier {
           .order('created_at', ascending: false);
       
       _withdrawalRequests = List<Map<String, dynamic>>.from(withdrawalsResponse);
+      
+      // 6. Calculate Financials Per Unit
+      final Map<String, Map<String, dynamic>> unitFinancials = {};
+      for (var t in _topups) {
+        final unitId = t['unit_id'].toString();
+        if (!unitFinancials.containsKey(unitId)) {
+          unitFinancials[unitId] = {
+            'revenue': 0.0,
+            'units': 0.0,
+            'count': 0,
+          };
+        }
+        unitFinancials[unitId]!['revenue'] += (double.tryParse(t['amount_paid'].toString()) ?? 0.0);
+        unitFinancials[unitId]!['units'] += (double.tryParse(t['amount_vended'].toString()) ?? 0.0);
+        unitFinancials[unitId]!['count'] += 1;
+      }
+
+      // 7. Enrich Units with Financials
+      for (var i = 0; i < _units.length; i++) {
+        final unitId = _units[i]['id'].toString();
+        final financials = unitFinancials[unitId] ?? {'revenue': 0.0, 'units': 0.0, 'count': 0};
+        _units[i]['totalRevenue'] = financials['revenue'];
+        _units[i]['totalUnitsVended'] = financials['units'];
+        _units[i]['transactionCount'] = financials['count'];
+      }
 
     } catch (e) {
       _error = e.toString();
@@ -220,6 +267,7 @@ class LandlordProvider extends ChangeNotifier {
     required String email,
     required String phoneNumber,
     required String unitId,
+    required String password,
   }) async {
     final user = _supabase.auth.currentUser;
     if (user == null) throw Exception('Not logged in');
@@ -228,46 +276,21 @@ class LandlordProvider extends ChangeNotifier {
       _isLoading = true;
       notifyListeners();
 
-      // 1. Create Auth User (requires unauthenticated client for SignUp or Edge Function)
-      // Ideally this should be an Edge Function 'create-tenant' so we don't expose anon key logic here.
-      // But adhering to the "cook up" request:
-      final tempSupabase = SupabaseClient(supabaseUrl, supabaseAnonKey);
-      
-      final authResponse = await tempSupabase.auth.signUp(
-        email: email,
-        password: 'ChangeMe123!', // Temp password
-        data: {'full_name': fullName, 'role': 'tenant', 'phone_number': phoneNumber},
-      );
-      
-      if (authResponse.user == null) throw Exception('Failed to create user account');
-      final newUserId = authResponse.user!.id;
-      
-      // 2. EXPLICITLY create Profile (Critical: Triggers might fail or be missing)
-      // Landlords have RLS permission to INSERT profiles where role='tenant'
-      try {
-        await _supabase.from('profiles').upsert({
-          'id': newUserId,
-          'full_name': fullName,
+      // Call Edge Function for secure onboarding
+      final response = await _supabase.functions.invoke(
+        'create-tenant',
+        body: {
           'email': email,
-          'phone': phoneNumber,
-          'role': 'tenant',
-          'created_at': DateTime.now().toIso8601String(),
-        });
-      } catch (e) {
-        print("Profile creation warning (might already exist): $e");
-        // Provide backup mechanism? No, just proceed. If profile fails, tenant shows as "Unknown".
-      }
+          'password': password,
+          'fullName': fullName,
+          'phoneNumber': phoneNumber,
+          'unitId': unitId,
+        },
+      );
 
-      // 3. Assign unit
-      await _supabase.from('unit_assignments').insert({
-        'unit_id': unitId,
-        'tenant_id': newUserId,
-        'status': 'active',
-        'start_date': DateTime.now().toIso8601String(),
-      });
-      
-      // 4. Update unit status
-      await _supabase.from('units').update({'status': 'occupied'}).eq('id', unitId);
+      if (response.status != 200) {
+        throw Exception(response.data['error'] ?? 'Failed to create tenant');
+      }
 
       await fetchData();
     } catch (e) {

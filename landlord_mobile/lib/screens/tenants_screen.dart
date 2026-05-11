@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../providers/landlord_provider.dart';
 import '../widgets/top_toast.dart';
+import '../widgets/tutorial_target.dart';
 import 'tenant_details_screen.dart';
 
 class TenantsScreen extends StatefulWidget {
@@ -37,6 +38,10 @@ class _TenantsScreenState extends State<TenantsScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
+        leading: IconButton(
+          icon: const Icon(PhosphorIconsRegular.caretLeft),
+          onPressed: () => context.go('/dashboard'),
+        ),
         title: const Text('Tenants Hub'),
         actions: [
           IconButton(
@@ -86,16 +91,8 @@ class _TenantsScreenState extends State<TenantsScreen> {
               final propertyName = unit['properties']?['name'] ?? 'Unknown Property';
               final unitLabel = unit['label'] ?? 'Unknown Unit';
 
-              return InkWell(
-                onTap: () {
-                  Navigator.of(context).push(
-                    MaterialPageRoute(
-                      builder: (context) => TenantDetailsScreen(tenant: tenant),
-                    ),
-                  );
-                },
-                borderRadius: BorderRadius.circular(16),
-                child: Container(
+              final isFirst = i == 0;
+              final card = Container(
                   decoration: BoxDecoration(
                     color: Colors.white,
                     borderRadius: BorderRadius.circular(16),
@@ -164,7 +161,18 @@ class _TenantsScreenState extends State<TenantsScreen> {
                       ],
                     ),
                   ),
-                ),
+                );
+
+              return InkWell(
+                onTap: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (context) => TenantDetailsScreen(tenant: tenant),
+                    ),
+                  );
+                },
+                borderRadius: BorderRadius.circular(16),
+                child: isFirst ? TutorialTarget(id: 'tenant_card_0', child: card) : card,
               );
             },
           );

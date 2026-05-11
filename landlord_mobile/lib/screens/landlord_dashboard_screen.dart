@@ -6,6 +6,8 @@ import 'package:phosphor_flutter/phosphor_flutter.dart';
 import '../providers/auth_provider.dart';
 import '../providers/landlord_provider.dart';
 import '../widgets/top_toast.dart';
+import '../widgets/help_bottom_sheet.dart';
+import 'package:intl/intl.dart';
 
 class LandlordDashboardScreen extends StatefulWidget {
   const LandlordDashboardScreen({super.key});
@@ -15,6 +17,17 @@ class LandlordDashboardScreen extends StatefulWidget {
 }
 
 class _LandlordDashboardScreenState extends State<LandlordDashboardScreen> {
+  String _selectedRevenueFilter = 'Total'; 
+
+  void _showHelpBottomSheet(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => const HelpBottomSheet(),
+    );
+  }
+
   @override
   void initState() {
     super.initState();
@@ -70,19 +83,38 @@ class _LandlordDashboardScreenState extends State<LandlordDashboardScreen> {
                             ),
                           ],
                         ),
-                        Material(
-                          color: Colors.white,
-                          shape: const CircleBorder(),
-                          elevation: 2,
-                          shadowColor: Colors.black12,
-                          child: InkWell(
-                            customBorder: const CircleBorder(),
-                            onTap: () {}, // TODO: Notifications
-                            child: Container(
-                              padding: const EdgeInsets.all(10),
-                              child: Icon(PhosphorIcons.bell(), color: Colors.black87),
+                        Row(
+                          children: [
+                            Material(
+                              color: Colors.white,
+                              shape: const CircleBorder(),
+                              elevation: 2,
+                              shadowColor: Colors.black12,
+                              child: InkWell(
+                                customBorder: const CircleBorder(),
+                                onTap: () => _showHelpBottomSheet(context),
+                                child: Container(
+                                  padding: const EdgeInsets.all(10),
+                                  child: Icon(PhosphorIcons.question(), color: Colors.black87),
+                                ),
+                              ),
                             ),
-                          ),
+                            const SizedBox(width: 12),
+                            Material(
+                              color: Colors.white,
+                              shape: const CircleBorder(),
+                              elevation: 2,
+                              shadowColor: Colors.black12,
+                              child: InkWell(
+                                customBorder: const CircleBorder(),
+                                onTap: () {}, // TODO: Notifications
+                                child: Container(
+                                  padding: const EdgeInsets.all(10),
+                                  child: Icon(PhosphorIcons.bell(), color: Colors.black87),
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
                       ],
                     ),
@@ -97,12 +129,12 @@ class _LandlordDashboardScreenState extends State<LandlordDashboardScreen> {
                           begin: Alignment.topLeft,
                           end: Alignment.bottomRight,
                         ),
-                        borderRadius: BorderRadius.circular(20),
+                        borderRadius: BorderRadius.circular(24),
                         boxShadow: [
                           BoxShadow(
                             color: const Color(0xFF1ECF49).withValues(alpha: 0.3),
-                            blurRadius: 10,
-                            offset: const Offset(0, 4),
+                            blurRadius: 15,
+                            offset: const Offset(0, 6),
                           ),
                         ],
                       ),
@@ -112,8 +144,8 @@ class _LandlordDashboardScreenState extends State<LandlordDashboardScreen> {
                             top: -20,
                             right: -20,
                             child: Container(
-                              width: 100,
-                              height: 100,
+                              width: 120,
+                              height: 120,
                               decoration: BoxDecoration(
                                 color: Colors.white.withValues(alpha: 0.1),
                                 shape: BoxShape.circle,
@@ -125,29 +157,83 @@ class _LandlordDashboardScreenState extends State<LandlordDashboardScreen> {
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                const Text(
-                                  'Total Monthly Revenue',
-                                  style: TextStyle(color: Colors.white70, fontSize: 13),
-                                ),
-                                Text(
-                                  'KSh ${landlord.totalRevenue.toStringAsFixed(2)}',
-                                  style: GoogleFonts.spaceMono(
-                                    textStyle: const TextStyle(
-                                      color: Colors.white,
-                                      fontSize: 32,
-                                      fontWeight: FontWeight.bold,
-                                      letterSpacing: 1,
-                                    ),
-                                  ),
-                                ),
-                                const SizedBox(height: 16),
                                 Row(
+                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                   children: [
-                                    _MiniStat(label: 'Properties', value: landlord.properties.length.toString()),
-                                    const SizedBox(width: 24),
-                                    _MiniStat(label: 'Total Units', value: landlord.totalUnitsCount.toString()),
-                                    const SizedBox(width: 24),
-                                    _MiniStat(label: 'Occupied', value: landlord.activeTenantsCount.toString()),
+                                    Text(
+                                      '$_selectedRevenueFilter Revenue',
+                                      style: const TextStyle(color: Colors.white70, fontSize: 13, fontWeight: FontWeight.w500),
+                                    ),
+                                    PopupMenuButton<String>(
+                                      icon: const Icon(PhosphorIconsRegular.funnel, color: Colors.white, size: 20),
+                                      onSelected: (value) => setState(() => _selectedRevenueFilter = value),
+                                      itemBuilder: (context) => [
+                                        const PopupMenuItem(value: 'Total', child: Text('Total Revenue')),
+                                        const PopupMenuItem(value: 'Monthly', child: Text('Monthly Revenue')),
+                                        const PopupMenuItem(value: 'Annually', child: Text('Annual Revenue')),
+                                        const PopupMenuItem(value: 'Current', child: Text('Available Balance')),
+                                      ],
+                                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                    ),
+                                  ],
+                                ),
+                                Builder(
+                                  builder: (context) {
+                                    double amount = 0;
+                                    if (_selectedRevenueFilter == 'Total') amount = landlord.lifetimeRevenue;
+                                    if (_selectedRevenueFilter == 'Monthly') amount = landlord.monthlyRevenue;
+                                    if (_selectedRevenueFilter == 'Annually') amount = landlord.annualRevenue;
+                                    if (_selectedRevenueFilter == 'Current') amount = landlord.availableBalance;
+
+                                    return Text(
+                                      'KSh ${NumberFormat('#,###').format(amount)}',
+                                      style: GoogleFonts.spaceMono(
+                                        textStyle: const TextStyle(
+                                          color: Colors.white,
+                                          fontSize: 34,
+                                          fontWeight: FontWeight.bold,
+                                          letterSpacing: 1,
+                                        ),
+                                      ),
+                                    );
+                                  },
+                                ),
+                                const SizedBox(height: 24),
+                                Row(
+                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    _CompactStat(
+                                      label: 'Available Balance',
+                                      value: 'KSh ${NumberFormat('#,###').format(landlord.availableBalance)}',
+                                      fontSize: 14,
+                                    ),
+                                    _CompactStat(
+                                      label: 'Monthly Balance',
+                                      value: 'KSh ${NumberFormat('#,###').format(landlord.monthlyRevenue)}',
+                                      fontSize: 14,
+                                    ),
+                                  ],
+                                ),
+                                const Divider(color: Colors.white24, height: 24),
+                                Row(
+                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    _CompactStat(
+                                      label: 'Total Revenue Generated',
+                                      value: 'KSh ${NumberFormat('#,###').format(landlord.lifetimeRevenue)}',
+                                      fontSize: 11,
+                                      opacity: 0.8,
+                                    ),
+                                    Row(
+                                      children: [
+                                        const Icon(PhosphorIconsRegular.house, color: Colors.white70, size: 14),
+                                        const SizedBox(width: 4),
+                                        Text(
+                                          '${landlord.properties.length} Props',
+                                          style: const TextStyle(color: Colors.white70, fontSize: 11),
+                                        ),
+                                      ],
+                                    ),
                                   ],
                                 ),
                               ],
@@ -196,7 +282,7 @@ class _LandlordDashboardScreenState extends State<LandlordDashboardScreen> {
                             iconColor: const Color(0xFF1890FF),
                             bgColor: const Color(0xFFE6F7FF),
                             label: 'Tenants Hub',
-                            onTap: () => context.push('/tenants'),
+                            onTap: () => context.go('/tenants'),
                           ),
                         ),
                         const SizedBox(width: 12),
@@ -255,6 +341,42 @@ class _MiniStat extends StatelessWidget {
       children: [
         Text(label, style: const TextStyle(color: Colors.white70, fontSize: 11)),
         Text(value, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
+      ],
+    );
+  }
+}
+
+class _CompactStat extends StatelessWidget {
+  final String label;
+  final String value;
+  final double fontSize;
+  final double opacity;
+
+  const _CompactStat({
+    required this.label,
+    required this.value,
+    this.fontSize = 12,
+    this.opacity = 1.0,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: TextStyle(color: Colors.white.withValues(alpha: 0.7 * opacity), fontSize: 10, fontWeight: FontWeight.w500),
+        ),
+        const SizedBox(height: 2),
+        Text(
+          value,
+          style: TextStyle(
+            color: Colors.white.withValues(alpha: opacity),
+            fontWeight: FontWeight.bold,
+            fontSize: fontSize,
+          ),
+        ),
       ],
     );
   }

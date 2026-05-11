@@ -5,6 +5,7 @@ import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import 'package:go_router/go_router.dart';
 import '../providers/landlord_provider.dart';
+import '../widgets/tutorial_target.dart';
 
 class MetersScreen extends StatefulWidget {
   const MetersScreen({super.key});
@@ -163,6 +164,8 @@ class _MetersScreenState extends State<MetersScreen> {
                   title: Text(
                     meterNumber,
                     style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                    overflow: TextOverflow.ellipsis,
+                    maxLines: 1,
                   ),
                   subtitle: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -172,7 +175,14 @@ class _MetersScreenState extends State<MetersScreen> {
                         children: [
                           const Icon(PhosphorIconsRegular.house, size: 14, color: Colors.grey),
                           const SizedBox(width: 4),
-                          Text('$propertyName • Unit $label', style: const TextStyle(color: Colors.grey)),
+                          Expanded(
+                            child: Text(
+                              '$propertyName • Unit $label',
+                              style: const TextStyle(color: Colors.grey),
+                              overflow: TextOverflow.ellipsis,
+                              maxLines: 1,
+                            ),
+                          ),
                         ],
                       ),
                       const SizedBox(height: 6),
@@ -196,15 +206,28 @@ class _MetersScreenState extends State<MetersScreen> {
                       ),
                     ],
                   ),
-                  trailing: IconButton(
-                    icon: const Icon(PhosphorIconsRegular.qrCode),
-                    onPressed: () => _showQrDialog(unit),
-                    tooltip: 'Generate QR',
-                    style: IconButton.styleFrom(
-                      backgroundColor: const Color(0xFFF0F5FF),
-                      foregroundColor: const Color(0xFF2F54EB),
-                    ),
-                  ),
+                  trailing: (i == 0)
+                      ? TutorialTarget(
+                          id: 'meter_qr_0',
+                          child: IconButton(
+                            icon: const Icon(PhosphorIconsRegular.qrCode),
+                            onPressed: () => _showQrDialog(unit),
+                            tooltip: 'Generate QR',
+                            style: IconButton.styleFrom(
+                              backgroundColor: const Color(0xFFF0F5FF),
+                              foregroundColor: const Color(0xFF2F54EB),
+                            ),
+                          ),
+                        )
+                      : IconButton(
+                          icon: const Icon(PhosphorIconsRegular.qrCode),
+                          onPressed: () => _showQrDialog(unit),
+                          tooltip: 'Generate QR',
+                          style: IconButton.styleFrom(
+                            backgroundColor: const Color(0xFFF0F5FF),
+                            foregroundColor: const Color(0xFF2F54EB),
+                          ),
+                        ),
                 ),
               );
             },

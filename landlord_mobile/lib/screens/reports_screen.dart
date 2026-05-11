@@ -13,6 +13,8 @@ class ReportsScreen extends StatefulWidget {
 }
 
 class _ReportsScreenState extends State<ReportsScreen> {
+  String _selectedPerformanceFilter = 'Current';
+
   Future<void> _refresh() async {
     await context.read<LandlordProvider>().refresh();
   }
@@ -22,34 +24,65 @@ class _ReportsScreenState extends State<ReportsScreen> {
     final landlord = context.watch<LandlordProvider>();
     final units = landlord.units;
     final issues = landlord.issues;
+    final topups = landlord.topups;
 
     final propertyId = GoRouterState.of(context).uri.queryParameters['propertyId'];
 
-    // Filter Logic
-    List<Map<String, dynamic>> displayedUnits = units;
-    List<Map<String, dynamic>> displayedIssues = issues;
-    double displayedRevenue = landlord.totalRevenue;
+    // Filter Logic for Revenue & Unit Performance
+    final now = DateTime.now();
+    final startOfMonth = DateTime(now.year, now.month, 1);
+    final startOfYear = DateTime(now.year, 1, 1);
+
+    List<Map<String, dynamic>> filteredTopups = topups;
+    if (_selectedPerformanceFilter == 'Monthly') {
+      filteredTopups = topups.where((t) => DateTime.parse(t['created_at']).isAfter(startOfMonth)).toList();
+    } else if (_selectedPerformanceFilter == 'Annually') {
+      filteredTopups = topups.where((t) => DateTime.parse(t['created_at']).isAfter(startOfYear)).toList();
+    } else if (_selectedPerformanceFilter == 'Current') {
+      // "Current" could mean this month or specifically available balance logic.
+      // User said "Current balance to be default... since there's sometimes when some balance might be from the previous month"
+      // Let's treat "Current" as this month's revenue for the performance list, but maybe we show Available Balance in the summary.
+      filteredTopups = topups.where((t) => DateTime.parse(t['created_at']).isAfter(startOfMonth)).toList();
+    }
 
     if (propertyId != null) {
-      displayedUnits = units.where((u) {
-         final pId = u['property_id'] ?? u['properties']?['id'];
-         return pId.toString() == propertyId;
+      filteredTopups = filteredTopups.where((t) {
+        final unit = t['units'] ?? {};
+        final pId = unit['property_id'] ?? unit['properties']?['id'];
+        return pId.toString() == propertyId;
       }).toList();
+    }
 
+    // Recalculate Per-Unit Performance based on filteredTopups
+    final Map<String, Map<String, dynamic>> unitPerformance = {};
+    for (var t in filteredTopups) {
+      final unitId = t['unit_id'].toString();
+      if (!unitPerformance.containsKey(unitId)) {
+        unitPerformance[unitId] = {'revenue': 0.0, 'units': 0.0, 'count': 0};
+      }
+      unitPerformance[unitId]!['revenue'] += (double.tryParse(t['amount_paid'].toString()) ?? 0.0);
+      unitPerformance[unitId]!['units'] += (double.tryParse(t['amount_vended'].toString()) ?? 0.0);
+      unitPerformance[unitId]!['count'] += 1;
+    }
+
+    List<Map<String, dynamic>> displayedUnits = units;
+    if (propertyId != null) {
+      displayedUnits = units.where((u) {
+        final pId = u['property_id'] ?? u['properties']?['id'];
+        return pId.toString() == propertyId;
+      }).toList();
+    }
+
+    double totalDisplayedRevenue = filteredTopups.fold(0.0, (sum, item) => sum + (double.tryParse(item['amount_paid'].toString()) ?? 0.0));
+    
+    // Issues Filter
+    List<Map<String, dynamic>> displayedIssues = issues;
+    if (propertyId != null) {
       displayedIssues = issues.where((i) {
          final unit = i['units'] ?? {};
          final pId = unit['property_id'] ?? unit['properties']?['id'];
          return pId.toString() == propertyId;
       }).toList();
-
-      // Recalculate revenue for specific property
-      final propertyTopups = landlord.topups.where((t) {
-         final unit = t['units'] ?? {};
-         final pId = unit['property_id'] ?? unit['properties']?['id'];
-         return pId.toString() == propertyId;
-      }).toList();
-      
-      displayedRevenue = propertyTopups.fold(0.0, (sum, item) => sum + (double.tryParse(item['amount_paid'].toString()) ?? 0.0));
     }
 
     int totalUnits = displayedUnits.length;
@@ -76,6 +109,33 @@ class _ReportsScreenState extends State<ReportsScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  // Filter Chips
+                  SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    child: Row(
+                      children: ['Current', 'Monthly', 'Annually', 'Overall'].map((filter) {
+                        final isSelected = _selectedPerformanceFilter == filter;
+                        return Padding(
+                          padding: const EdgeInsets.only(right: 8),
+                          child: ChoiceChip(
+                            label: Text(filter),
+                            selected: isSelected,
+                            onSelected: (val) {
+                              if (val) setState(() => _selectedPerformanceFilter = filter);
+                            },
+                            selectedColor: const Color(0xFF1ECF49),
+                            labelStyle: TextStyle(
+                              color: isSelected ? Colors.white : Colors.black87,
+                              fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                            ),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                          ),
+                        );
+                      }).toList(),
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+
                   // Occupancy Overview
                   Container(
                     padding: const EdgeInsets.all(20),
@@ -158,23 +218,99 @@ class _ReportsScreenState extends State<ReportsScreen> {
                     children: [
                       Expanded(
                         child: _ReportStatCard(
-                          icon: PhosphorIconsFill.warningCircle,
-                          iconColor: const Color(0xFFF5222D),
-                          label: 'Pending Issues',
-                          value: pendingIssues.toString(),
+                          icon: PhosphorIconsFill.coins,
+                          iconColor: const Color(0xFFFAAD14),
+                          label: '$_selectedPerformanceFilter Revenue',
+                          value: 'KES ${NumberFormat('#,###').format(totalDisplayedRevenue)}',
                         ),
                       ),
                       const SizedBox(width: 16),
                       Expanded(
                         child: _ReportStatCard(
-                          icon: PhosphorIconsFill.coins,
+                          icon: PhosphorIconsFill.chartLineUp,
                           iconColor: const Color(0xFF1ECF49),
-                          label: 'Revenue (Mo.)',
-                          value: '${displayedRevenue.toInt()}', // Simplified for demo
+                          label: 'Lifetime Revenue',
+                          value: 'KES ${NumberFormat('#,###').format(landlord.lifetimeRevenue)}',
                         ),
                       ),
                     ],
                   ),
+                  
+                  const SizedBox(height: 24),
+                  const Text('Financial Performance by Unit', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 12),
+                  
+                  if (displayedUnits.isEmpty)
+                    const Text('No units available for this property.', style: TextStyle(color: Colors.grey))
+                  else
+                    ...displayedUnits.map((unit) {
+                      final unitId = unit['id'].toString();
+                      final label = unit['label'] ?? 'Unknown';
+                      final perf = unitPerformance[unitId] ?? {'revenue': 0.0, 'units': 0.0, 'count': 0};
+                      final revenue = perf['revenue'];
+                      final unitsVended = perf['units'];
+                      final txCount = perf['count'];
+                      
+                      return Container(
+                        margin: const EdgeInsets.only(bottom: 12),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(12),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withValues(alpha: 0.02),
+                              blurRadius: 5,
+                              offset: const Offset(0, 2),
+                            ),
+                          ],
+                        ),
+                        child: Material(
+                          color: Colors.transparent,
+                          child: InkWell(
+                            borderRadius: BorderRadius.circular(12),
+                            onTap: () => _showUnitPerformanceDetails(context, unit, perf),
+                            child: Padding(
+                              padding: const EdgeInsets.all(16),
+                              child: Row(
+                                children: [
+                                  Container(
+                                    padding: const EdgeInsets.all(10),
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xFFF0F2F5),
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
+                                    child: const Icon(PhosphorIconsFill.houseLine, color: Colors.blueGrey, size: 20),
+                                  ),
+                                  const SizedBox(width: 12),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Text('Unit $label', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                                        Text('$txCount transactions', style: const TextStyle(fontSize: 12, color: Colors.grey)),
+                                      ],
+                                    ),
+                                  ),
+                                  Column(
+                                    crossAxisAlignment: CrossAxisAlignment.end,
+                                    children: [
+                                      Text(
+                                        'KES ${NumberFormat('#,###').format(revenue)}',
+                                        style: const TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF1ECF49)),
+                                      ),
+                                      Text(
+                                        '${unitsVended.toStringAsFixed(1)} Units',
+                                        style: const TextStyle(fontSize: 12, color: Colors.grey),
+                                      ),
+                                    ],
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                      );
+                    }),
 
                   const SizedBox(height: 24),
                   const Text('Maintenance Issues', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
@@ -275,6 +411,104 @@ class _ReportsScreenState extends State<ReportsScreen> {
                 ],
               ),
             ),
+    );
+  }
+
+  void _showUnitPerformanceDetails(BuildContext context, Map<String, dynamic> unit, Map<String, dynamic> perf) {
+    final label = unit['label'] ?? 'Unknown';
+    final revenue = perf['revenue'];
+    final unitsVended = perf['units'];
+    final txCount = perf['count'];
+    final status = unit['status'] ?? 'N/A';
+    final propertyName = unit['properties']?['name'] ?? 'Unknown Property';
+
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+      builder: (ctx) => Padding(
+        padding: const EdgeInsets.all(24.0),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  'Unit $label Performance',
+                  style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                ),
+                IconButton(
+                  onPressed: () => Navigator.pop(ctx),
+                  icon: const Icon(PhosphorIconsRegular.x),
+                ),
+              ],
+            ),
+            const Divider(height: 32),
+            _ReportDetailRow(label: 'Property', value: propertyName),
+            const SizedBox(height: 16),
+            _ReportDetailRow(label: 'Total Revenue ($_selectedPerformanceFilter)', value: 'KES ${NumberFormat('#,###').format(revenue)}', isValueBold: true),
+            const SizedBox(height: 16),
+            _ReportDetailRow(label: 'Units Consumed', value: '${unitsVended.toStringAsFixed(1)} Units'),
+            const SizedBox(height: 16),
+            _ReportDetailRow(label: 'Transaction Count', value: '$txCount vends'),
+            const SizedBox(height: 16),
+            _ReportDetailRow(label: 'Current Status', value: status.toUpperCase(), isStatus: true),
+            const SizedBox(height: 32),
+            SizedBox(
+              width: double.infinity,
+              child: FilledButton(
+                onPressed: () => Navigator.pop(ctx),
+                style: FilledButton.styleFrom(
+                  backgroundColor: const Color(0xFF1ECF49),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                ),
+                child: const Text('Close'),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ReportDetailRow extends StatelessWidget {
+  final String label;
+  final String value;
+  final bool isValueBold;
+  final bool isStatus;
+
+  const _ReportDetailRow({
+    required this.label,
+    required this.value,
+    this.isValueBold = false,
+    this.isStatus = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    Color valueColor = isStatus 
+        ? (value == 'OCCUPIED' || value == 'ACTIVE' ? const Color(0xFF52C41A) : const Color(0xFFFA8C16))
+        : Colors.black87;
+
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Text(label, style: const TextStyle(color: Colors.grey, fontSize: 14)),
+        Flexible(
+          child: Text(
+            value,
+            textAlign: TextAlign.right,
+            style: TextStyle(
+              fontWeight: isValueBold || isStatus ? FontWeight.bold : FontWeight.normal,
+              fontSize: 14,
+              color: valueColor,
+            ),
+          ),
+        ),
+      ],
     );
   }
 }

@@ -405,7 +405,6 @@ class _CaretakerMeterCard extends StatelessWidget {
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
-              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
                   unit['meter_number'] ?? 'Unknown Meter',
