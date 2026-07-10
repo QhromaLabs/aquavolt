@@ -99,7 +99,7 @@ class _LandlordBuyTokenScreenState extends State<LandlordBuyTokenScreen> {
   // Calculation Helpers
   double get _netAmount {
     if (_amount == null) return 0;
-    return _amount! * (1 - _serviceFeePercent / 100);
+    return _amount!;
   }
 
   double get _estimatedUnits {

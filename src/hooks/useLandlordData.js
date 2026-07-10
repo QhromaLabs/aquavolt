@@ -159,6 +159,7 @@ export const useLandlordData = () => {
                     const unit = unitsWithDerivedStatus.find(u => u.id === t.unit_id);
                     return {
                         ...t,
+                        amount_paid: (parseFloat(t.amount_paid) || 0) * 0.95,
                         unit: { meter_number: unit?.meter_number }
                     };
                 });
@@ -171,7 +172,10 @@ export const useLandlordData = () => {
                 .eq('landlord_id', user.id);
 
             if (withdrawError) console.error('Error fetching withdrawals:', withdrawError);
-            const allWithdrawals = withdrawData || [];
+            const allWithdrawals = (withdrawData || []).map(w => ({
+                ...w,
+                amount: (parseFloat(w.amount) || 0) * 0.95
+            }));
             setWithdrawals(allWithdrawals);
 
             // 6. Calculate stats

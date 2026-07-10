@@ -122,6 +122,7 @@ function App() {
                                         <Route path="meters" element={<LandlordMeters />} />
                                         <Route path="tenants" element={<LandlordTenants />} />
                                         <Route path="finance" element={<LandlordFinance />} />
+                                        <Route path="settings" element={<Settings />} />
                                         <Route path="*" element={<Navigate to="/landlord/dashboard" replace />} />
                                     </Routes>
                                 </RLSGuard>
@@ -137,6 +138,7 @@ function App() {
                                         <Route path="dashboard" element={<CaretakerDashboard />} />
                                         <Route path="submit-fault" element={<SubmitFault />} />
                                         <Route path="issues" element={<CaretakerIssues />} />
+                                        <Route path="settings" element={<Settings />} />
                                         <Route path="*" element={<Navigate to="/caretaker/dashboard" replace />} />
                                     </Routes>
                                 </RLSGuard>
@@ -167,6 +169,7 @@ function App() {
                                 <RLSGuard allowedRoles="agent">
                                     <Routes>
                                         <Route path="dashboard" element={<AgentDashboard />} />
+                                        <Route path="settings" element={<Settings />} />
                                         <Route path="*" element={<Navigate to="/agent/dashboard" replace />} />
                                     </Routes>
                                 </RLSGuard>

@@ -114,8 +114,9 @@ serve(async (req) => {
                     const serviceFeePercent = settings.service_fee_percent ? parseFloat(settings.service_fee_percent) : 5
                     const tariff = settings.tariff_ksh_per_kwh ? parseFloat(settings.tariff_ksh_per_kwh) : 28 // Default safely
 
-                    const fee = updatedPayment.amount * (serviceFeePercent / 100)
-                    const netAmount = updatedPayment.amount - fee
+                    // Service fee is 0% on token purchasing (charged 5% on withdrawal instead)
+                    const fee = 0
+                    const netAmount = updatedPayment.amount
 
                     // Calculate estimated units to vend
                     // Futurise "money" field expects units when configured this way

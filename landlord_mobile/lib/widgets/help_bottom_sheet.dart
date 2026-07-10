@@ -3,6 +3,9 @@ import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import '../providers/tutorial_provider.dart';
+import '../providers/landlord_provider.dart';
+import '../screens/tenant_details_screen.dart';
+import 'buy_tokens_bottom_sheet.dart';
 
 class HelpBottomSheet extends StatelessWidget {
   const HelpBottomSheet({super.key});
@@ -77,6 +80,60 @@ class HelpBottomSheet extends StatelessWidget {
               _startWithdrawalTutorial(context);
             },
           ),
+          const SizedBox(height: 16),
+          _TutorialTile(
+            title: 'Buy Tokens',
+            subtitle: 'How to purchase tokens for your units',
+            icon: PhosphorIconsRegular.lightning,
+            color: const Color(0xFF722ED1),
+            onTap: () {
+              Navigator.pop(context); // Close help sheet
+              
+              // Open modal first
+              showModalBottomSheet(
+                context: context,
+                isScrollControlled: true,
+                backgroundColor: Colors.transparent,
+                builder: (context) => const BuyTokensBottomSheet(),
+              );
+
+              // Start tutorial with targets
+              final tutorial = context.read<TutorialProvider>();
+              tutorial.startTutorial([
+                TutorialStep(
+                  title: 'Token Amount',
+                  description: 'First, enter the KSh amount you want to purchase. You can also use the quick select buttons.',
+                  targetId: 'buy_tokens_amount_field',
+                  route: '/landlord-dashboard',
+                ),
+                TutorialStep(
+                  title: 'Choose Destination',
+                  description: 'Use the "Tenants" tab to pick a registered tenant, or "Manual" to enter a custom number.',
+                  targetId: 'buy_tokens_tabs',
+                  route: '/landlord-dashboard',
+                ),
+                TutorialStep(
+                  title: 'Unit Assignment',
+                  description: 'In the Manual tab, you can search and select the specific unit you are buying tokens for.',
+                  targetId: 'buy_tokens_unit_select',
+                  route: '/landlord-dashboard',
+                  onStepStarted: () => BuyTokensBottomSheet.switchToManualTab(),
+                ),
+                TutorialStep(
+                  title: 'M-Pesa Number',
+                  description: 'Enter the M-Pesa number that will receive the payment prompt (STK Push).',
+                  targetId: 'buy_tokens_phone_field',
+                  route: '/landlord-dashboard',
+                ),
+                TutorialStep(
+                  title: 'Complete Purchase',
+                  description: 'Once ready, click "Buy Tokens Now" to receive the M-Pesa prompt on your phone.',
+                  targetId: 'buy_tokens_submit',
+                  route: '/landlord-dashboard',
+                ),
+              ]);
+            },
+          ),
           const SizedBox(height: 32),
           Center(
             child: Text(
@@ -127,20 +184,53 @@ class HelpBottomSheet extends StatelessWidget {
     tutorial.startTutorial([
       TutorialStep(
         title: 'Tenants Hub',
-        description: 'This is your central hub for managing all current and past tenancies.',
+        description: 'Your central dashboard for managing all current and past tenancies across your properties.',
         route: '/tenants',
         onStepStarted: () => context.go('/tenants'),
       ),
       TutorialStep(
         title: 'Manage Tenant',
-        description: 'Click on any tenant in the list to view their detailed profile and settings.',
+        description: 'Click on any tenant card to view their detailed profile, contact info, and unit history.',
         route: '/tenants',
         targetId: 'tenant_card_0',
       ),
       TutorialStep(
-        title: 'Tenant Settings',
-        description: 'Inside the details page, you can update contact info, adjust unit assignment, and manage bills.',
+        title: 'Tenant Profile',
+        description: 'Inside the details, you can see the tenant\'s unit assignment, property, and contact details.',
         route: '/tenants',
+        targetId: 'tenant_profile_card',
+        onStepStarted: () {
+          final tenants = context.read<LandlordProvider>().tenants;
+          if (tenants.isNotEmpty) {
+            context.push('/tenants/details', extra: tenants.first);
+          }
+        },
+      ),
+      TutorialStep(
+        title: 'Buy Tokens',
+        description: 'Need to buy tokens for this tenant? Use this shortcut to open the purchase modal instantly.',
+        route: '/tenants',
+        targetId: 'tenant_buy_token_button',
+      ),
+      TutorialStep(
+        title: 'Maintenance Requests',
+        description: 'Track and manage any issues or requests submitted by this tenant for their specific unit.',
+        route: '/tenants',
+        targetId: 'tenant_requests_button',
+      ),
+      TutorialStep(
+        title: 'Reassign Unit',
+        description: 'Moving a tenant to a different room? Use this to transfer them to any vacant unit you own.',
+        route: '/tenants',
+        targetId: 'tenant_reassign_button',
+        onStepStarted: () => TenantDetailsScreen.scrollToBottom(),
+      ),
+      TutorialStep(
+        title: 'Terminate Tenancy',
+        description: 'When a tenant moves out, use this to vacate the unit and stop their access to the meter.',
+        route: '/tenants',
+        targetId: 'tenant_terminate_button',
+        onStepStarted: () => TenantDetailsScreen.scrollToBottom(),
       ),
     ]);
   }

@@ -24,7 +24,7 @@ class LandlordProvider extends ChangeNotifier {
   String? get error => _error;
 
   // Financial Metrics
-  double get lifetimeRevenue => _topups.fold(0.0, (sum, item) => sum + (double.tryParse(item['amount_paid'].toString()) ?? 0.0));
+  double get lifetimeRevenue => _topups.fold(0.0, (sum, item) => sum + (double.tryParse(item['amount_paid'].toString()) ?? 0.0)) * 0.95;
   
   double get monthlyRevenue {
     final now = DateTime.now();
@@ -32,7 +32,7 @@ class LandlordProvider extends ChangeNotifier {
     return _topups.where((t) {
       final date = DateTime.parse(t['created_at']);
       return date.isAfter(startOfMonth);
-    }).fold(0.0, (sum, item) => sum + (double.tryParse(item['amount_paid'].toString()) ?? 0.0));
+    }).fold(0.0, (sum, item) => sum + (double.tryParse(item['amount_paid'].toString()) ?? 0.0)) * 0.95;
   }
 
   double get annualRevenue {
@@ -41,15 +41,16 @@ class LandlordProvider extends ChangeNotifier {
     return _topups.where((t) {
       final date = DateTime.parse(t['created_at']);
       return date.isAfter(startOfYear);
-    }).fold(0.0, (sum, item) => sum + (double.tryParse(item['amount_paid'].toString()) ?? 0.0));
+    }).fold(0.0, (sum, item) => sum + (double.tryParse(item['amount_paid'].toString()) ?? 0.0)) * 0.95;
   }
 
   double get availableBalance {
-    final totalPaid = lifetimeRevenue;
-    final totalWithdrawn = _withdrawalRequests
+    final totalPaidNet = lifetimeRevenue;
+    final totalWithdrawnGross = _withdrawalRequests
         .where((r) => ['approved', 'completed'].contains(r['status']))
         .fold(0.0, (sum, item) => sum + (double.tryParse(item['amount'].toString()) ?? 0.0));
-    return totalPaid - totalWithdrawn;
+    final totalWithdrawnNet = totalWithdrawnGross * 0.95;
+    return totalPaidNet - totalWithdrawnNet;
   }
 
   double get totalUnitsVended => _topups.fold(0.0, (sum, item) => sum + (double.tryParse(item['amount_vended'].toString()) ?? 0.0));
@@ -62,7 +63,7 @@ class LandlordProvider extends ChangeNotifier {
       transactions.add({
         'type': 'credit',
         'id': t['id'],
-        'amount': double.tryParse(t['amount_paid'].toString()) ?? 0.0,
+        'amount': (double.tryParse(t['amount_paid'].toString()) ?? 0.0) * 0.95,
         'date': DateTime.parse(t['created_at']),
         'status': 'completed',
         'title': 'Token Purchase',
@@ -75,7 +76,7 @@ class LandlordProvider extends ChangeNotifier {
       transactions.add({
         'type': 'debit',
         'id': w['id'],
-        'amount': double.tryParse(w['amount'].toString()) ?? 0.0,
+        'amount': (double.tryParse(w['amount'].toString()) ?? 0.0) * 0.95,
         'date': DateTime.parse(w['created_at']),
         'status': w['status'],
         'title': 'Withdrawal',
@@ -239,7 +240,7 @@ class LandlordProvider extends ChangeNotifier {
             'count': 0,
           };
         }
-        unitFinancials[unitId]!['revenue'] += (double.tryParse(t['amount_paid'].toString()) ?? 0.0);
+        unitFinancials[unitId]!['revenue'] += (double.tryParse(t['amount_paid'].toString()) ?? 0.0) * 0.95;
         unitFinancials[unitId]!['units'] += (double.tryParse(t['amount_vended'].toString()) ?? 0.0);
         unitFinancials[unitId]!['count'] += 1;
       }
@@ -445,7 +446,7 @@ class LandlordProvider extends ChangeNotifier {
       // 1. Submit Request
       await _supabase.from('withdrawal_requests').insert({
         'landlord_id': user.id,
-        'amount': amount,
+        'amount': amount / 0.95,
         'mpesa_number': mpesaNumber,
         'status': 'pending',
         'created_at': DateTime.now().toIso8601String(),

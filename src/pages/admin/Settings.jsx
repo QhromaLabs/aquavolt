@@ -73,10 +73,12 @@ const Settings = () => {
     const [configureModalVisible, setConfigureModalVisible] = useState(false);
 
     useEffect(() => {
-        fetchSystemSettings();
-        fetchCredentials();
-        fetchSmsLogs();
-    }, []);
+        if (profile?.role === 'admin') {
+            fetchSystemSettings();
+            fetchCredentials();
+            fetchSmsLogs();
+        }
+    }, [profile]);
 
     const fetchSystemSettings = async () => {
         try {
@@ -531,7 +533,7 @@ const Settings = () => {
             ),
         },
         */
-        {
+        profile?.role === 'admin' && {
             key: 'sms-logs',
             label: (
                 <span>
@@ -681,7 +683,7 @@ const Settings = () => {
                 </Card>
             )
         },
-        {
+        profile?.role === 'admin' && {
             key: '4',
             label: (
                 <span>
@@ -754,7 +756,7 @@ const Settings = () => {
                 </div>
             )
         }
-    ];
+    ].filter(Boolean);
 
     return (
         <MainLayout>

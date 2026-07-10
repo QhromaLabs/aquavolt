@@ -40,6 +40,18 @@ const MainLayout = ({ children }) => {
         navigate('/login');
     };
 
+    const handleUserMenuClick = ({ key }) => {
+        if (key === 'logout') {
+            handleLogout();
+        } else if (key === 'profile' || key === 'settings') {
+            if (isAdmin) navigate('/admin/settings');
+            else if (isLandlord) navigate('/landlord/settings');
+            else if (isCaretaker) navigate('/caretaker/settings');
+            else if (isTenant) navigate('/tenant/profile');
+            else if (isAgent) navigate('/agent/settings');
+        }
+    };
+
     const userMenu = {
         items: [
             {
@@ -59,7 +71,6 @@ const MainLayout = ({ children }) => {
                 key: 'logout',
                 icon: <LogoutOutlined />,
                 label: 'Logout',
-                onClick: handleLogout,
             },
         ],
     };
@@ -92,6 +103,7 @@ const MainLayout = ({ children }) => {
                 { key: '/landlord/meters', icon: <BulbOutlined />, label: 'My Meters' },
                 { key: '/landlord/tenants', icon: <TeamOutlined />, label: 'My Tenants' },
                 { key: '/landlord/finance', icon: <DollarOutlined />, label: 'Finance' },
+                { key: '/landlord/settings', icon: <SettingOutlined />, label: 'Settings' },
             ];
         }
 
@@ -100,6 +112,7 @@ const MainLayout = ({ children }) => {
                 { key: '/caretaker/dashboard', icon: <DashboardOutlined />, label: 'Dashboard' },
                 { key: '/caretaker/submit-fault', icon: <ToolOutlined />, label: 'Submit Fault' },
                 { key: '/caretaker/issues', icon: <FileTextOutlined />, label: 'Issues' },
+                { key: '/caretaker/settings', icon: <SettingOutlined />, label: 'Settings' },
             ];
         }
 
@@ -114,6 +127,7 @@ const MainLayout = ({ children }) => {
         if (isAgent) {
             return [
                 { key: '/agent/dashboard', icon: <DashboardOutlined />, label: 'Dashboard' },
+                { key: '/agent/settings', icon: <SettingOutlined />, label: 'Settings' },
             ];
         }
 
@@ -172,7 +186,7 @@ const MainLayout = ({ children }) => {
                             {profile?.full_name || 'User'}
                         </Text>
                     </div>
-                    <Dropdown menu={userMenu} placement="bottomRight">
+                    <Dropdown menu={{ items: userMenu.items, onClick: handleUserMenuClick }} placement="bottomRight">
                         <Button type="text" style={{ height: 'auto', padding: 8, display: 'flex', alignItems: 'center' }}>
                             <Avatar style={{ backgroundColor: '#1ecf49' }}>
                                 {profile?.full_name?.charAt(0) || 'U'}

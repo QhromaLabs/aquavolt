@@ -56,7 +56,8 @@ class _HistoryScreenState extends State<HistoryScreen> {
             separatorBuilder: (ctx, i) => const SizedBox(height: 12),
             itemBuilder: (ctx, i) {
               final topup = provider.topups[i];
-              final amount = topup['amount_paid'];
+              final rawAmount = double.tryParse(topup['amount_paid'].toString()) ?? 0.0;
+              final amount = rawAmount * 0.95;
               final unitsKwh = topup['units_kwh'] ?? 0;
               final createdAt = DateTime.parse(topup['created_at']);
               final formattedDate = DateFormat('MMM d, y • h:mm a').format(createdAt);

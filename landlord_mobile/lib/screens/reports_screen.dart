@@ -60,7 +60,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
       if (!unitPerformance.containsKey(unitId)) {
         unitPerformance[unitId] = {'revenue': 0.0, 'units': 0.0, 'count': 0};
       }
-      unitPerformance[unitId]!['revenue'] += (double.tryParse(t['amount_paid'].toString()) ?? 0.0);
+      unitPerformance[unitId]!['revenue'] += (double.tryParse(t['amount_paid'].toString()) ?? 0.0) * 0.95;
       unitPerformance[unitId]!['units'] += (double.tryParse(t['amount_vended'].toString()) ?? 0.0);
       unitPerformance[unitId]!['count'] += 1;
     }
@@ -73,7 +73,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
       }).toList();
     }
 
-    double totalDisplayedRevenue = filteredTopups.fold(0.0, (sum, item) => sum + (double.tryParse(item['amount_paid'].toString()) ?? 0.0));
+    double totalDisplayedRevenue = filteredTopups.fold(0.0, (sum, item) => sum + (double.tryParse(item['amount_paid'].toString()) ?? 0.0)) * 0.95;
     
     // Issues Filter
     List<Map<String, dynamic>> displayedIssues = issues;

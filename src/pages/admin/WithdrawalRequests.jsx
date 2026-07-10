@@ -165,14 +165,26 @@ const WithdrawalRequests = () => {
             ),
         },
         {
-            title: 'Amount',
-            dataIndex: 'amount',
+            title: 'Amount (KES)',
             key: 'amount',
-            render: (amount) => (
-                <Text strong style={{ color: '#52c41a' }}>
-                    KES {parseFloat(amount).toLocaleString()}
-                </Text>
-            ),
+            render: (_, record) => {
+                const amt = parseFloat(record.amount) || 0;
+                const fee = amt * 0.05;
+                const net = amt * 0.95;
+                return (
+                    <Space direction="vertical" size={0}>
+                        <Text strong style={{ color: '#1890ff' }}>
+                            Req: {amt.toLocaleString()}
+                        </Text>
+                        <Text type="secondary" style={{ fontSize: 11 }}>
+                            Fee: {fee.toLocaleString()} (5%)
+                        </Text>
+                        <Text strong style={{ color: '#52c41a' }}>
+                            Net Payout: {net.toLocaleString()}
+                        </Text>
+                    </Space>
+                );
+            }
         },
         {
             title: 'M-Pesa Number',
@@ -343,12 +355,23 @@ const WithdrawalRequests = () => {
                                     </Text>
                                 </Space>
                             </Descriptions.Item>
-                            <Descriptions.Item label="Amount to Transfer">
-                                <Space>
-                                    <DollarOutlined />
-                                    <Text strong style={{ fontSize: 24, color: '#52c41a' }}>
-                                        KES {parseFloat(selectedRequest.amount).toLocaleString()}
-                                    </Text>
+                            <Descriptions.Item label="Amount Details">
+                                <Space direction="vertical" size={4} style={{ width: '100%' }}>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                                        <Text type="secondary">Requested (Deducted from Landlord):</Text>
+                                        <Text strong>KES {parseFloat(selectedRequest.amount).toLocaleString()}</Text>
+                                    </div>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                                        <Text type="secondary">Aquavolt Commission (5%):</Text>
+                                        <Text type="danger" strong>KES {(parseFloat(selectedRequest.amount) * 0.05).toLocaleString()}</Text>
+                                    </div>
+                                    <Divider style={{ margin: '8px 0' }} />
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                        <Text strong style={{ fontSize: '15px' }}>Net to Transfer (95%):</Text>
+                                        <Text strong style={{ fontSize: '20px', color: '#52c41a' }}>
+                                            KES {(parseFloat(selectedRequest.amount) * 0.95).toLocaleString()}
+                                        </Text>
+                                    </div>
                                 </Space>
                             </Descriptions.Item>
                         </Descriptions>
@@ -358,7 +381,7 @@ const WithdrawalRequests = () => {
                         <div style={{ backgroundColor: '#f6ffed', padding: 12, borderRadius: 8, border: '1px solid #b7eb8f' }}>
                             <Text type="secondary">
                                 <CheckCircleOutlined style={{ color: '#52c41a', marginRight: 8 }} />
-                                Please ensure you send the exact amount to the M-Pesa number above before marking as paid.
+                                Please ensure you send the exact Net Payout amount (KES {(parseFloat(selectedRequest.amount) * 0.95).toLocaleString()}) to the M-Pesa number above before marking as paid.
                             </Text>
                         </div>
                     </div>

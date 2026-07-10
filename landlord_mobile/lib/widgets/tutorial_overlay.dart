@@ -110,7 +110,7 @@ class _TutorialUIState extends State<_TutorialUI> with SingleTickerProviderState
                         height: highlightSize?.height ?? 60,
                         decoration: BoxDecoration(
                           color: Colors.white,
-                          borderRadius: BorderRadius.circular(12),
+                          borderRadius: BorderRadius.circular(24), // Match modal/card radius
                         ),
                       ),
                     ),
@@ -120,12 +120,30 @@ class _TutorialUIState extends State<_TutorialUI> with SingleTickerProviderState
             else
               Container(color: Colors.black.withValues(alpha: 0.7)),
 
+            // Glowing Outline
+            if (highlightPos != null)
+              Positioned(
+                left: highlightPos.dx - (highlightSize?.width ?? 60) / 2 - 4,
+                top: highlightPos.dy - (highlightSize?.height ?? 60) / 2 - 4,
+                child: _GlowingRect(
+                  size: Size((highlightSize?.width ?? 60) + 8, (highlightSize?.height ?? 60) + 8),
+                ),
+              ),
+
             // Instruction Card
-            Align(
-              alignment: Alignment.bottomCenter,
+            AnimatedAlign(
+              duration: const Duration(milliseconds: 400),
+              curve: Curves.easeOutBack,
+              alignment: (highlightPos != null && highlightPos.dy > MediaQuery.of(context).size.height * 0.5)
+                  ? Alignment.topCenter
+                  : Alignment.bottomCenter,
               child: Padding(
                 padding: const EdgeInsets.all(24.0),
                 child: Container(
+                  margin: EdgeInsets.only(
+                    top: (highlightPos != null && highlightPos.dy > MediaQuery.of(context).size.height * 0.5) ? 40 : 0,
+                    bottom: (highlightPos != null && highlightPos.dy <= MediaQuery.of(context).size.height * 0.5) ? 40 : 0,
+                  ),
                   padding: const EdgeInsets.all(24),
                   decoration: BoxDecoration(
                     color: Colors.white,
@@ -133,8 +151,8 @@ class _TutorialUIState extends State<_TutorialUI> with SingleTickerProviderState
                     boxShadow: [
                       BoxShadow(
                         color: Colors.black.withValues(alpha: 0.2),
-                        blurRadius: 20,
-                        offset: const Offset(0, 10),
+                        blurRadius: 30,
+                        offset: const Offset(0, 15),
                       ),
                     ],
                   ),
@@ -169,7 +187,7 @@ class _TutorialUIState extends State<_TutorialUI> with SingleTickerProviderState
                       const SizedBox(height: 16),
                       Text(
                         step.title,
-                        style: const TextStyle(
+                        style: GoogleFonts.outfit(
                           fontSize: 20,
                           fontWeight: FontWeight.bold,
                           color: Colors.black87,
@@ -178,7 +196,7 @@ class _TutorialUIState extends State<_TutorialUI> with SingleTickerProviderState
                       const SizedBox(height: 8),
                       Text(
                         step.description,
-                        style: TextStyle(
+                        style: GoogleFonts.outfit(
                           fontSize: 14,
                           color: Colors.grey.shade600,
                           height: 1.5,
@@ -192,9 +210,10 @@ class _TutorialUIState extends State<_TutorialUI> with SingleTickerProviderState
                               onPressed: () => widget.tutorial.stopTutorial(),
                               style: OutlinedButton.styleFrom(
                                 padding: const EdgeInsets.symmetric(vertical: 16),
+                                side: BorderSide(color: Colors.grey.shade200),
                                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                               ),
-                              child: const Text('Skip'),
+                              child: Text('Skip', style: GoogleFonts.outfit(color: Colors.grey.shade600)),
                             ),
                           ),
                           const SizedBox(width: 12),
@@ -212,6 +231,7 @@ class _TutorialUIState extends State<_TutorialUI> with SingleTickerProviderState
                                 widget.tutorial.currentStepIndex == widget.tutorial.currentTutorialSteps.length - 1
                                     ? 'Finish'
                                     : 'Next',
+                                style: GoogleFonts.outfit(fontWeight: FontWeight.bold),
                               ),
                             ),
                           ),
@@ -222,14 +242,6 @@ class _TutorialUIState extends State<_TutorialUI> with SingleTickerProviderState
                 ),
               ),
             ),
-            
-            // Pulse highlight (optional visual cue)
-            if (highlightPos != null)
-              Positioned(
-                left: highlightPos.dx - (highlightSize?.width ?? 60) / 2 - 10,
-                top: highlightPos.dy - (highlightSize?.height ?? 60) / 2 - 10,
-                child: _PulseCircle(size: (highlightSize?.width ?? 60) + 20),
-              ),
           ],
         ),
       ),
@@ -237,21 +249,21 @@ class _TutorialUIState extends State<_TutorialUI> with SingleTickerProviderState
   }
 }
 
-class _PulseCircle extends StatefulWidget {
-  final double size;
-  const _PulseCircle({required this.size});
+class _GlowingRect extends StatefulWidget {
+  final Size size;
+  const _GlowingRect({required this.size});
 
   @override
-  State<_PulseCircle> createState() => _PulseCircleState();
+  State<_GlowingRect> createState() => _GlowingRectState();
 }
 
-class _PulseCircleState extends State<_PulseCircle> with SingleTickerProviderStateMixin {
-  late AnimationController _pulseController;
+class _GlowingRectState extends State<_GlowingRect> with SingleTickerProviderStateMixin {
+  late AnimationController _glowController;
 
   @override
   void initState() {
     super.initState();
-    _pulseController = AnimationController(
+    _glowController = AnimationController(
       vsync: this,
       duration: const Duration(seconds: 1),
     )..repeat(reverse: true);
@@ -259,24 +271,31 @@ class _PulseCircleState extends State<_PulseCircle> with SingleTickerProviderSta
 
   @override
   void dispose() {
-    _pulseController.dispose();
+    _glowController.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     return AnimatedBuilder(
-      animation: _pulseController,
+      animation: _glowController,
       builder: (context, child) {
         return Container(
-          width: widget.size,
-          height: widget.size,
+          width: widget.size.width,
+          height: widget.size.height,
           decoration: BoxDecoration(
-            shape: BoxShape.circle,
+            borderRadius: BorderRadius.circular(26), // 24 (hole) + 2 (offset)
             border: Border.all(
-              color: const Color(0xFF1ECF49).withValues(alpha: 0.5 * _pulseController.value),
-              width: 4 * _pulseController.value,
+              color: const Color(0xFF1ECF49).withValues(alpha: 0.8 * _glowController.value),
+              width: 3 * _glowController.value,
             ),
+            boxShadow: [
+              BoxShadow(
+                color: const Color(0xFF1ECF49).withValues(alpha: 0.3 * _glowController.value),
+                blurRadius: 10 * _glowController.value,
+                spreadRadius: 2 * _glowController.value,
+              ),
+            ],
           ),
         );
       },

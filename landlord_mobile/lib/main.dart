@@ -16,6 +16,7 @@ import 'screens/add_property_screen.dart';
 import 'screens/add_tenant_screen.dart';
 import 'screens/wallet_screen.dart';
 import 'screens/tenants_screen.dart';
+import 'screens/tenant_details_screen.dart';
 import 'screens/reports_screen.dart';
 import 'widgets/scaffold_with_navbar.dart';
 import 'widgets/caretaker_scaffold_with_navbar.dart';
@@ -99,6 +100,14 @@ class LandlordApp extends StatelessWidget {
                 GoRoute(
                   path: '/tenants',
                   builder: (context, state) => const TenantsScreen(),
+                  routes: [
+                    GoRoute(
+                      path: 'details',
+                      builder: (context, state) => TenantDetailsScreen(
+                        tenant: state.extra as Map<String, dynamic>,
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),

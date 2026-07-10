@@ -108,12 +108,11 @@ class _BuyTokenScreenState extends State<BuyTokenScreen> {
   // Calculation Helpers
   double get _netAmount {
     if (_amount == null) return 0;
-    return _amount! * (1 - _serviceFeePercent / 100);
+    return _amount!;
   }
 
   double get _feeAmount {
-    if (_amount == null) return 0;
-    return _amount! * (_serviceFeePercent / 100);
+    return 0;
   }
 
   double get _estimatedUnits {

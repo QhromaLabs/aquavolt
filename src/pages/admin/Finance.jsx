@@ -1,4 +1,3 @@
-import { useState, useEffect } from 'react';
 import {
     Typography,
     Card,
@@ -9,7 +8,8 @@ import {
     Tag,
     Space,
     DatePicker,
-    Button
+    Button,
+    Select
 } from 'antd';
 import {
     DollarOutlined,
@@ -40,12 +40,26 @@ import { supabase } from '../../lib/supabase';
 const { Title, Text } = Typography;
 const { RangePicker } = DatePicker;
 
+import { useState, useEffect } from 'react';
+
 const AdminFinance = () => {
     const [loading, setLoading] = useState(false);
     const [transactions, setTransactions] = useState([]);
     const [revenueData, setRevenueData] = useState([]);
     const [channelData, setChannelData] = useState([]);
     const [landlordData, setLandlordData] = useState([]);
+
+    // Raw datasets
+    const [rawData, setRawData] = useState({ topups: [], units: [], withdrawals: [] });
+    const [landlordsFilterList, setLandlordsFilterList] = useState([]);
+    const [propertiesFilterList, setPropertiesFilterList] = useState([]);
+
+    // Filters
+    const [landlordFilter, setLandlordFilter] = useState('all');
+    const [propertyFilter, setPropertyFilter] = useState('all');
+    const [monthFilter, setMonthFilter] = useState('all');
+    const [yearFilter, setYearFilter] = useState('all');
+    const [yearsFilterList, setYearsFilterList] = useState([]);
 
     // Stats
     const [stats, setStats] = useState({
@@ -59,6 +73,66 @@ const AdminFinance = () => {
     useEffect(() => {
         fetchData();
     }, []);
+
+    // Filter properties based on selected landlord
+    const getFilteredProperties = () => {
+        if (landlordFilter === 'all') return propertiesFilterList;
+        const landlordPropertyIds = new Set();
+        rawData.units.forEach(u => {
+            if (u.property?.landlord?.id === landlordFilter && u.property?.id) {
+                landlordPropertyIds.add(u.property.id);
+            }
+        });
+        return propertiesFilterList.filter(p => landlordPropertyIds.has(p.id));
+    };
+
+    const handleLandlordChange = (value) => {
+        setLandlordFilter(value);
+        if (value !== 'all') {
+            const landlordPropertyIds = new Set();
+            rawData.units.forEach(u => {
+                if (u.property?.landlord?.id === value && u.property?.id) {
+                    landlordPropertyIds.add(u.property.id);
+                }
+            });
+            if (propertyFilter !== 'all' && !landlordPropertyIds.has(propertyFilter)) {
+                setPropertyFilter('all');
+            }
+        }
+    };
+
+    // Filter Effect
+    useEffect(() => {
+        let filteredTopups = [...rawData.topups];
+        let filteredUnits = [...rawData.units];
+        let filteredWithdrawals = [...rawData.withdrawals];
+
+        if (landlordFilter !== 'all') {
+            filteredTopups = filteredTopups.filter(t => t.unit?.property?.landlord?.id === landlordFilter);
+            filteredUnits = filteredUnits.filter(u => u.property?.landlord?.id === landlordFilter);
+            filteredWithdrawals = filteredWithdrawals.filter(w => w.landlord_id === landlordFilter);
+        }
+
+        if (propertyFilter !== 'all') {
+            filteredTopups = filteredTopups.filter(t => t.unit?.property?.id === propertyFilter);
+            filteredUnits = filteredUnits.filter(u => u.property?.id === propertyFilter);
+            filteredWithdrawals = [];
+        }
+
+        if (monthFilter !== 'all') {
+            const m = parseInt(monthFilter, 10);
+            filteredTopups = filteredTopups.filter(t => new Date(t.created_at).getMonth() + 1 === m);
+            filteredWithdrawals = filteredWithdrawals.filter(w => new Date(w.created_at).getMonth() + 1 === m);
+        }
+
+        if (yearFilter !== 'all') {
+            const y = parseInt(yearFilter, 10);
+            filteredTopups = filteredTopups.filter(t => new Date(t.created_at).getFullYear() === y);
+            filteredWithdrawals = filteredWithdrawals.filter(w => new Date(w.created_at).getFullYear() === y);
+        }
+
+        processData(filteredTopups, filteredUnits, filteredWithdrawals);
+    }, [rawData, landlordFilter, propertyFilter, monthFilter, yearFilter]);
 
     const fetchData = async () => {
         setLoading(true);
@@ -75,6 +149,7 @@ const AdminFinance = () => {
                     unit:unit_id ( 
                         label, 
                         property:property_id ( 
+                            id,
                             name, 
                             landlord:landlord_id ( id, full_name ) 
                         ) 
@@ -91,6 +166,7 @@ const AdminFinance = () => {
                     id,
                     current_balance,
                     property:property_id ( 
+                        id,
                         landlord:landlord_id ( id, full_name ) 
                     )
                 `);
@@ -104,7 +180,48 @@ const AdminFinance = () => {
 
             if (withdrawalsError) throw withdrawalsError;
 
-            processData(topups || [], units || [], withdrawals || []);
+            // Populate unique landlords, properties & years maps
+            const landlordsMap = new Map();
+            const propertiesMap = new Map();
+            const yearsSet = new Set();
+
+            topups?.forEach(t => {
+                const landlord = t.unit?.property?.landlord;
+                const property = t.unit?.property;
+                if (landlord) landlordsMap.set(landlord.id, landlord.full_name);
+                if (property) propertiesMap.set(property.id, property.name);
+                if (t.created_at) {
+                    yearsSet.add(new Date(t.created_at).getFullYear());
+                }
+            });
+
+            units?.forEach(u => {
+                const landlord = u.property?.landlord;
+                const property = u.property;
+                if (landlord) landlordsMap.set(landlord.id, landlord.full_name);
+                if (property) propertiesMap.set(property.id, property.name);
+            });
+
+            withdrawals?.forEach(w => {
+                if (w.created_at) {
+                    yearsSet.add(new Date(w.created_at).getFullYear());
+                }
+            });
+
+            setLandlordsFilterList(Array.from(landlordsMap.entries()).map(([id, name]) => ({ id, name })));
+            setPropertiesFilterList(Array.from(propertiesMap.entries()).map(([id, name]) => ({ id, name })));
+            
+            const yearsSorted = Array.from(yearsSet).sort((a, b) => b - a);
+            if (yearsSorted.length === 0) {
+                yearsSorted.push(new Date().getFullYear());
+            }
+            setYearsFilterList(yearsSorted);
+
+            setRawData({
+                topups: topups || [],
+                units: units || [],
+                withdrawals: withdrawals || []
+            });
         } catch (error) {
             console.error('Error fetching finance data:', error);
         } finally {
@@ -120,12 +237,16 @@ const AdminFinance = () => {
             .filter(d => d.created_at.startsWith(today))
             .reduce((acc, curr) => acc + (curr.amount_paid || 0), 0);
 
+        const totalWithdrawnApproved = withdrawals
+            .filter(w => w.status === 'approved' || w.status === 'completed')
+            .reduce((acc, w) => acc + (parseFloat(w.amount) || 0), 0);
+
         setStats({
             totalRevenue: total,
             todayRevenue: todayTotal,
             avgTransaction: topups.length ? total / topups.length : 0,
             totalTransactions: topups.length,
-            netIncome: total * 0.05
+            netIncome: totalWithdrawnApproved * 0.05
         });
 
         // 2. Prepare Chart Data (Group by Date)
@@ -310,6 +431,88 @@ const AdminFinance = () => {
                 <Title level={2}><DollarOutlined /> Finance Dashboard</Title>
                 <Text type="secondary">Revenue overview and transaction analytics</Text>
             </div>
+
+            {/* Filters */}
+            <Card style={{ marginBottom: 24, borderRadius: 8 }}>
+                <Space wrap size="large" style={{ width: '100%', justifyContent: 'space-between' }}>
+                    <Space wrap size="middle">
+                        <div>
+                            <span style={{ marginRight: 8, fontWeight: 500 }}>Landlord:</span>
+                            <Select
+                                value={landlordFilter}
+                                onChange={handleLandlordChange}
+                                style={{ width: 180 }}
+                            >
+                                <Select.Option value="all">All Landlords</Select.Option>
+                                {landlordsFilterList.map(l => (
+                                    <Select.Option key={l.id} value={l.id}>{l.name}</Select.Option>
+                                ))}
+                            </Select>
+                        </div>
+                        <div>
+                            <span style={{ marginRight: 8, fontWeight: 500 }}>Property:</span>
+                            <Select
+                                value={propertyFilter}
+                                onChange={setPropertyFilter}
+                                style={{ width: 180 }}
+                            >
+                                <Select.Option value="all">All Properties</Select.Option>
+                                {getFilteredProperties().map(p => (
+                                    <Select.Option key={p.id} value={p.id}>{p.name}</Select.Option>
+                                ))}
+                            </Select>
+                        </div>
+                        <div>
+                            <span style={{ marginRight: 8, fontWeight: 500 }}>Month:</span>
+                            <Select
+                                value={monthFilter}
+                                onChange={setMonthFilter}
+                                style={{ width: 140 }}
+                            >
+                                <Select.Option value="all">All Months</Select.Option>
+                                <Select.Option value="1">January</Select.Option>
+                                <Select.Option value="2">February</Select.Option>
+                                <Select.Option value="3">March</Select.Option>
+                                <Select.Option value="4">April</Select.Option>
+                                <Select.Option value="5">May</Select.Option>
+                                <Select.Option value="6">June</Select.Option>
+                                <Select.Option value="7">July</Select.Option>
+                                <Select.Option value="8">August</Select.Option>
+                                <Select.Option value="9">September</Select.Option>
+                                <Select.Option value="10">October</Select.Option>
+                                <Select.Option value="11">November</Select.Option>
+                                <Select.Option value="12">December</Select.Option>
+                            </Select>
+                        </div>
+                        <div>
+                            <span style={{ marginRight: 8, fontWeight: 500 }}>Year:</span>
+                            <Select
+                                value={yearFilter}
+                                onChange={setYearFilter}
+                                style={{ width: 120 }}
+                            >
+                                <Select.Option value="all">All Years</Select.Option>
+                                {yearsFilterList.map(y => (
+                                    <Select.Option key={y} value={y.toString()}>{y}</Select.Option>
+                                ))}
+                            </Select>
+                        </div>
+                    </Space>
+                    {(landlordFilter !== 'all' || propertyFilter !== 'all' || monthFilter !== 'all' || yearFilter !== 'all') && (
+                        <Button 
+                            type="default" 
+                            onClick={() => {
+                                setLandlordFilter('all');
+                                setPropertyFilter('all');
+                                setMonthFilter('all');
+                                setYearFilter('all');
+                            }}
+                        >
+                            Reset Filters
+                        </Button>
+                    )}
+                </Space>
+            </Card>
 
             {/* Stats Cards */}
             <Row gutter={[16, 16]} style={{ marginBottom: 24 }}>

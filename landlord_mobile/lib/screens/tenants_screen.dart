@@ -164,13 +164,7 @@ class _TenantsScreenState extends State<TenantsScreen> {
                 );
 
               return InkWell(
-                onTap: () {
-                  Navigator.of(context).push(
-                    MaterialPageRoute(
-                      builder: (context) => TenantDetailsScreen(tenant: tenant),
-                    ),
-                  );
-                },
+                onTap: () => context.push('/tenants/details', extra: tenant),
                 borderRadius: BorderRadius.circular(16),
                 child: isFirst ? TutorialTarget(id: 'tenant_card_0', child: card) : card,
               );

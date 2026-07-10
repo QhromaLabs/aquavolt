@@ -273,7 +273,7 @@ const BuyToken = () => {
     const getNetAmount = () => {
         const amount = getAmount();
         if (!amount) return 0;
-        return amount * (1 - serviceFeePercent / 100);
+        return amount;
     };
 
     const getEstimatedKwh = () => {
@@ -411,18 +411,8 @@ const BuyToken = () => {
                                 border: '1px solid #f0f0f0'
                             }}>
                                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
-                                    <Text type="secondary">Amount</Text>
+                                    <Text type="secondary">Amount to Vend</Text>
                                     <Text strong>KES {getAmount().toFixed(2)}</Text>
-                                </div>
-                                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 12 }}>
-                                    <Text type="secondary">Service Fee ({serviceFeePercent}%)</Text>
-                                    <Text type="danger" style={{ color: '#ff4d4f' }}>
-                                        - KES {(getAmount() * (serviceFeePercent / 100)).toFixed(2)}
-                                    </Text>
-                                </div>
-                                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
-                                    <Text type="secondary">Net to Vend</Text>
-                                    <Text strong style={{ color: '#1f1f1f' }}>KES {getNetAmount().toFixed(2)}</Text>
                                 </div>
                                 <Divider style={{ margin: '8px 0', borderColor: '#e8e8e8' }} />
                                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>

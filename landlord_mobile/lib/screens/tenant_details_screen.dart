@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../providers/landlord_provider.dart';
 import '../widgets/top_toast.dart';
+import '../widgets/tutorial_target.dart';
 import 'landlord_buy_token_screen.dart';
 
 class TenantDetailsScreen extends StatefulWidget {
@@ -12,12 +13,49 @@ class TenantDetailsScreen extends StatefulWidget {
 
   const TenantDetailsScreen({super.key, required this.tenant});
 
+  static void scrollToBottom() => _TenantDetailsScreenState.scrollToBottom();
+  static void scrollToTop() => _TenantDetailsScreenState.scrollToTop();
+
   @override
   State<TenantDetailsScreen> createState() => _TenantDetailsScreenState();
 }
 
 class _TenantDetailsScreenState extends State<TenantDetailsScreen> {
+  final ScrollController _scrollController = ScrollController();
   
+  static _TenantDetailsScreenState? _instance;
+
+  static void scrollToBottom() {
+    _instance?._scrollController.animateTo(
+      _instance?._scrollController.position.maxScrollExtent ?? 0,
+      duration: const Duration(milliseconds: 500),
+      curve: Curves.easeInOut,
+    );
+  }
+
+  static void scrollToTop() {
+    _instance?._scrollController.animateTo(
+      0,
+      duration: const Duration(milliseconds: 500),
+      curve: Curves.easeInOut,
+    );
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _TenantDetailsScreenState._instance = this;
+  }
+
+  @override
+  void dispose() {
+    if (_TenantDetailsScreenState._instance == this) {
+      _TenantDetailsScreenState._instance = null;
+    }
+    _scrollController.dispose();
+    super.dispose();
+  }
+
   Map<String, dynamic> get tenant => widget.tenant;
   Map<String, dynamic> get unit => tenant['unit'] ?? {};
 
@@ -378,50 +416,54 @@ class _TenantDetailsScreenState extends State<TenantDetailsScreen> {
         elevation: 0,
       ),
       body: SingleChildScrollView(
+        controller: _scrollController,
         padding: const EdgeInsets.all(20),
         child: Column(
           children: [
             // Profile Card
-            Container(
-              padding: const EdgeInsets.all(24),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(20),
-                boxShadow: [
-                  BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 10, offset: const Offset(0, 5)),
-                ]
-              ),
-              child: Column(
-                children: [
-                   Container(
-                      width: 80,
-                      height: 80,
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFE6F7FF),
-                        shape: BoxShape.circle,
-                        border: Border.all(color: const Color(0xFF91D5FF), width: 2),
-                      ),
-                      child: const Icon(PhosphorIconsFill.user, color: Color(0xFF1890FF), size: 40),
-                    ),
-                    const SizedBox(height: 16),
-                    Text(name, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
-                    const SizedBox(height: 4),
-                    Text('$propertyName • Unit $unitLabel', style: TextStyle(fontSize: 14, color: Colors.grey.shade600)),
-                    const SizedBox(height: 16),
-                    const Divider(),
-                    const SizedBox(height: 16),
-                    // Contact
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceAround,
-                      children: [
-                         _buildContactAction(PhosphorIcons.phone(), 'Call', () => _makePhoneCall(phone)),
-                         _buildContactAction(PhosphorIcons.envelopeSimple(), 'Email', () => _sendEmail(email)),
-                         _buildContactAction(PhosphorIcons.pencilSimple(), 'Edit', () {}),
-                      ],
-                    )
-                ],
-              ),
-            ),
+             TutorialTarget(
+               id: 'tenant_profile_card',
+               child: Container(
+                 padding: const EdgeInsets.all(24),
+                 decoration: BoxDecoration(
+                   color: Colors.white,
+                   borderRadius: BorderRadius.circular(20),
+                   boxShadow: [
+                     BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 10, offset: const Offset(0, 5)),
+                   ]
+                 ),
+                 child: Column(
+                   children: [
+                      Container(
+                         width: 80,
+                         height: 80,
+                         decoration: BoxDecoration(
+                           color: const Color(0xFFE6F7FF),
+                           shape: BoxShape.circle,
+                           border: Border.all(color: const Color(0xFF91D5FF), width: 2),
+                         ),
+                         child: const Icon(PhosphorIconsFill.user, color: Color(0xFF1890FF), size: 40),
+                       ),
+                       const SizedBox(height: 16),
+                       Text(name, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
+                       const SizedBox(height: 4),
+                       Text('$propertyName • Unit $unitLabel', style: TextStyle(fontSize: 14, color: Colors.grey.shade600)),
+                       const SizedBox(height: 16),
+                       const Divider(),
+                       const SizedBox(height: 16),
+                       // Contact
+                       Row(
+                         mainAxisAlignment: MainAxisAlignment.spaceAround,
+                         children: [
+                            _buildContactAction(PhosphorIcons.phone(), 'Call', () => _makePhoneCall(phone)),
+                            _buildContactAction(PhosphorIcons.envelopeSimple(), 'Email', () => _sendEmail(email)),
+                            _buildContactAction(PhosphorIcons.pencilSimple(), 'Edit', () {}),
+                         ],
+                       )
+                   ],
+                 ),
+               ),
+             ),
             
             const SizedBox(height: 24),
 
@@ -429,22 +471,28 @@ class _TenantDetailsScreenState extends State<TenantDetailsScreen> {
             Row(
               children: [
                 Expanded(
-                  child: _buildActionCard(
-                    title: 'Buy Token',
-                    icon: PhosphorIcons.lightning(),
-                    color: const Color(0xFF1ECF49),
-                    onTap: _navigateToBuyToken,
+                  child: TutorialTarget(
+                    id: 'tenant_buy_token_button',
+                    child: _buildActionCard(
+                      title: 'Buy Token',
+                      icon: PhosphorIcons.lightning(),
+                      color: const Color(0xFF1ECF49),
+                      onTap: _navigateToBuyToken,
+                    ),
                   ),
                 ),
                 const SizedBox(width: 16),
                 Expanded(
-                  child: _buildActionCard(
-                    title: 'Requests',
-                    icon: PhosphorIcons.wrench(),
-                    color: Colors.orange,
-                    onTap: () {
-                      _showMaintenanceDialog();
-                    },
+                  child: TutorialTarget(
+                    id: 'tenant_requests_button',
+                    child: _buildActionCard(
+                      title: 'Requests',
+                      icon: PhosphorIcons.wrench(),
+                      color: Colors.orange,
+                      onTap: () {
+                        _showMaintenanceDialog();
+                      },
+                    ),
                   ),
                 ),
               ],
@@ -487,28 +535,34 @@ class _TenantDetailsScreenState extends State<TenantDetailsScreen> {
               ),
               child: Column(
                 children: [
-                   OutlinedButton.icon(
-                      onPressed: () => _showReassignModal(),
-                      icon: const Icon(PhosphorIconsRegular.arrowBendUpRight),
-                      label: const Text('Reassign Unit'),
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: Colors.orange,
-                        side: const BorderSide(color: Colors.orange),
-                        minimumSize: const Size(double.infinity, 48),
+                    TutorialTarget(
+                      id: 'tenant_reassign_button',
+                      child: OutlinedButton.icon(
+                        onPressed: () => _showReassignModal(),
+                        icon: const Icon(PhosphorIconsRegular.arrowBendUpRight),
+                        label: const Text('Reassign Unit'),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: Colors.orange,
+                          side: const BorderSide(color: Colors.orange),
+                          minimumSize: const Size(double.infinity, 48),
+                        ),
                       ),
-                   ),
+                    ),
                    const SizedBox(height: 12),
                    const SizedBox(height: 12),
-                   OutlinedButton.icon(
-                      onPressed: () => _showTerminateModal(),
-                      icon: const Icon(PhosphorIconsRegular.userMinus),
-                      label: const Text('Terminate Tenancy'),
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: Colors.red,
-                        side: const BorderSide(color: Colors.red),
-                        minimumSize: const Size(double.infinity, 48),
+                    TutorialTarget(
+                      id: 'tenant_terminate_button',
+                      child: OutlinedButton.icon(
+                        onPressed: () => _showTerminateModal(),
+                        icon: const Icon(PhosphorIconsRegular.userMinus),
+                        label: const Text('Terminate Tenancy'),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: Colors.red,
+                          side: const BorderSide(color: Colors.red),
+                          minimumSize: const Size(double.infinity, 48),
+                        ),
                       ),
-                   ),
+                    ),
                 ],
               ),
             ),
