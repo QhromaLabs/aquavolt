@@ -81,7 +81,7 @@ const TopupsLog = () => {
 
     const fetchUnitsAndTenants = async () => {
         try {
-            // Load units with tenant info from unit_assignments
+            // Load all units with optional tenant info from active unit_assignments
             const { data: u, error: unitsError } = await supabase
                 .from('units')
                 .select(`
@@ -90,19 +90,22 @@ const TopupsLog = () => {
                     meter_number, 
                     property_id, 
                     properties(name),
-                    unit_assignments!inner(tenant_id, status)
+                    unit_assignments(tenant_id, status)
                 `)
-                .eq('unit_assignments.status', 'active');
+                .order('label', { ascending: true });
 
             if (unitsError) {
                 console.error('Error fetching units:', unitsError);
                 message.error('Failed to load units: ' + unitsError.message);
             } else {
-                // Transform the data to flatten tenant_id
-                const unitsWithTenant = (u || []).map(unit => ({
-                    ...unit,
-                    tenant_id: unit.unit_assignments?.[0]?.tenant_id || null
-                }));
+                // Transform the data to flatten tenant_id (finding active assignment if any)
+                const unitsWithTenant = (u || []).map(unit => {
+                    const activeAssignment = (unit.unit_assignments || []).find(ua => ua.status === 'active');
+                    return {
+                        ...unit,
+                        tenant_id: activeAssignment?.tenant_id || null
+                    };
+                });
                 console.log('Units loaded:', unitsWithTenant);
                 setUnits(unitsWithTenant);
             }
@@ -489,8 +492,7 @@ const TopupsLog = () => {
 
                     <Form.Item
                         name="tenant_id"
-                        label="Select Tenant"
-                        rules={[{ required: true }]}
+                        label="Select Tenant (Optional)"
                     >
                         <Select showSearch optionFilterProp="children">
                             {tenants.map(t => (
